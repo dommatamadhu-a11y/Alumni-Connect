@@ -3,57 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alumni Smart Connect</title>
+    <title>Alumni Connect Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding-bottom: 80px; }
-        .header { background: #007bff; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding-bottom: 80px; }
+        .header { background: #007bff; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .section { display: none; padding: 15px; max-width: 500px; margin: auto; }
         .active { display: block; }
-        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .btn { background: #007bff; color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
-        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #ddd; }
-        .nav-item { border: none; background: none; color: #666; font-size: 12px; cursor: pointer; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; position: relative; overflow: auto; }
+        input, textarea { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        .btn { background: #007bff; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-post { background: #28a745; }
+        .btn-delete { background: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 11px; float: right; cursor: pointer; }
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #ddd; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .nav-item { border: none; background: none; color: #666; font-size: 12px; cursor: pointer; text-align: center; }
         .active-nav { color: #007bff; font-weight: bold; }
-        .group-tag { display: inline-block; background: #e7f3ff; color: #007bff; padding: 2px 8px; border-radius: 5px; font-size: 11px; margin-top: 5px; }
+        .nav-icon { font-size: 20px; display: block; }
+        .group-badge { background: #e7f3ff; color: #007bff; padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: bold; }
+        .timestamp { color: #999; font-size: 10px; display: block; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-<div class="header"><h2 id="page-title">Home Feed</h2></div>
+<div class="header">
+    <h2 id="page-title">Home Feed</h2>
+</div>
 
 <div id="feed" class="section active">
     <div class="card">
-        <textarea id="msgInput" style="width:100%; border:1px solid #ddd; border-radius:5px; padding:8px;" rows="2" placeholder="Post a message..."></textarea>
-        <button class="btn" style="background:#28a745; margin-top:5px;" onclick="sendPost()">Post</button>
+        <textarea id="msgInput" rows="2" placeholder="Write something to your group..."></textarea>
+        <button class="btn btn-post" onclick="sendPost()">Post to Wall</button>
     </div>
-    <div id="post-container">Loading...</div>
+    <div id="post-container">Loading posts...</div>
 </div>
 
 <div id="friends" class="section">
     <h3>Your Batchmates</h3>
-    <div id="group-info" style="margin-bottom:10px; color:#555; font-size:14px;"></div>
-    <div id="friends-list">Save profile to see batchmates!</div>
+    <p id="group-info" style="color: #666; font-size: 14px;"></p>
+    <div id="friends-list">Update your profile to see friends!</div>
 </div>
 
 <div id="profile" class="section">
     <div class="card">
         <h3>My Profile</h3>
         <input type="text" id="p-name" placeholder="Full Name">
-        <input type="text" id="p-inst" placeholder="Institution (Ex: ZPSS)">
-        <input type="text" id="p-year" placeholder="Passout Year (Ex: 2010)">
+        <input type="text" id="p-inst" placeholder="Institution (e.g., ZPSS)">
+        <input type="text" id="p-year" placeholder="Passout Year (e.g., 2010)">
         <input type="text" id="p-city" placeholder="City/Village">
-        <button class="btn" onclick="saveProfile()">Save & Join Groups</button>
+        <button class="btn" onclick="saveProfile()">Save & Join Group</button>
     </div>
 </div>
 
 <div class="nav-bar">
-    <button class="nav-item active-nav" id="nav-feed" onclick="show('feed', 'Home Feed', this)">🏠<br>Feed</button>
-    <button class="nav-item" id="nav-friends" onclick="show('friends', 'Batchmates', this)">👥<br>Friends</button>
-    <button class="nav-item" id="nav-profile" onclick="show('profile', 'My Profile', this)">👤<br>Profile</button>
+    <button class="nav-item active-nav" id="nav-feed" onclick="show('feed', 'Home Feed', this)">
+        <span class="nav-icon">🏠</span>Feed
+    </button>
+    <button class="nav-item" id="nav-friends" onclick="show('friends', 'Batchmates', this)">
+        <span class="nav-icon">👥</span>Friends
+    </button>
+    <button class="nav-item" id="nav-profile" onclick="show('profile', 'My Profile', this)">
+        <span class="nav-icon">👤</span>Profile
+    </button>
 </div>
 
 <script src="app.js"></script>
