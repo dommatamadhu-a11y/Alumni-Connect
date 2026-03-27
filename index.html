@@ -3,156 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alumni Connect Pro</title>
+    <title>Alumni Smart Connect</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding-bottom: 80px; }
-        .header { background: #007bff; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .section { display: none; padding: 15px; max-width: 600px; margin: auto; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding-bottom: 80px; }
+        .header { background: #007bff; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; }
+        .section { display: none; padding: 15px; max-width: 500px; margin: auto; }
         .active { display: block; }
-        
-        /* Post Box */
-        .post-box { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 10px; resize: none; box-sizing: border-box; }
-        .btn-post { background: #28a745; color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; }
-        
-        /* Feed Cards */
-        .post-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 5px solid #007bff; }
-        .post-user { color: #007bff; font-weight: bold; margin: 0; }
-        .post-time { color: #999; font-size: 11px; }
-
-        /* Profile Card */
-        .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .avatar { width: 80px; height: 80px; background: #007bff; color: white; font-size: 30px; line-height: 80px; border-radius: 50%; margin: 0 auto 15px; }
-        .input-group { text-align: left; margin-top: 15px; }
-        .input-group label { display: block; font-size: 12px; color: #666; margin-bottom: 5px; }
-        .input-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-
-        /* Bottom Nav */
-        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #ddd; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
-        .nav-item { border: none; background: none; font-size: 12px; color: #666; cursor: pointer; transition: 0.3s; }
-        .nav-item.active-nav { color: #007bff; font-weight: bold; }
-        .nav-icon { font-size: 20px; display: block; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .btn { background: #007bff; color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #ddd; }
+        .nav-item { border: none; background: none; color: #666; font-size: 12px; cursor: pointer; }
+        .active-nav { color: #007bff; font-weight: bold; }
+        .group-tag { display: inline-block; background: #e7f3ff; color: #007bff; padding: 2px 8px; border-radius: 5px; font-size: 11px; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h2 id="page-title">Home Feed</h2>
-</div>
+<div class="header"><h2 id="page-title">Home Feed</h2></div>
 
 <div id="feed" class="section active">
-    <div class="post-box">
-        <textarea id="msgInput" rows="3" placeholder="What's on your mind?"></textarea>
-        <button class="btn-post" onclick="sendPost()">Post to Wall</button>
+    <div class="card">
+        <textarea id="msgInput" style="width:100%; border:1px solid #ddd; border-radius:5px; padding:8px;" rows="2" placeholder="Post a message..."></textarea>
+        <button class="btn" style="background:#28a745; margin-top:5px;" onclick="sendPost()">Post</button>
     </div>
-    <div id="post-container">Loading posts...</div>
+    <div id="post-container">Loading...</div>
 </div>
 
 <div id="friends" class="section">
-    <h3>Discover Alumni</h3>
-    <div class="post-card">
-        <p>This feature will allow you to see all registered users soon!</p>
-    </div>
+    <h3>Your Batchmates</h3>
+    <div id="group-info" style="margin-bottom:10px; color:#555; font-size:14px;"></div>
+    <div id="friends-list">Save profile to see batchmates!</div>
 </div>
 
 <div id="profile" class="section">
-    <div class="profile-card">
-        <div class="avatar" id="profile-initial">M</div>
-        <h3 id="display-name-tag">User Name</h3>
-        
-        <div class="input-group">
-            <label>Display Name</label>
-            <input type="text" id="usernameInput" placeholder="Enter your name">
-        </div>
-        <button class="btn-post" style="background:#007bff;" onclick="saveProfile()">Save Profile</button>
+    <div class="card">
+        <h3>My Profile</h3>
+        <input type="text" id="p-name" placeholder="Full Name">
+        <input type="text" id="p-inst" placeholder="Institution (Ex: ZPSS)">
+        <input type="text" id="p-year" placeholder="Passout Year (Ex: 2010)">
+        <input type="text" id="p-city" placeholder="City/Village">
+        <button class="btn" onclick="saveProfile()">Save & Join Groups</button>
     </div>
 </div>
 
 <div class="nav-bar">
-    <button class="nav-item active-nav" id="btn-feed" onclick="show('feed', 'Home Feed', this)">
-        <span class="nav-icon">🏠</span>Feed
-    </button>
-    <button class="nav-item" id="btn-friends" onclick="show('friends', 'Find Friends', this)">
-        <span class="nav-icon">👥</span>Friends
-    </button>
-    <button class="nav-item" id="btn-profile" onclick="show('profile', 'My Profile', this)">
-        <span class="nav-icon">👤</span>Profile
-    </button>
+    <button class="nav-item active-nav" id="nav-feed" onclick="show('feed', 'Home Feed', this)">🏠<br>Feed</button>
+    <button class="nav-item" id="nav-friends" onclick="show('friends', 'Batchmates', this)">👥<br>Friends</button>
+    <button class="nav-item" id="nav-profile" onclick="show('profile', 'My Profile', this)">👤<br>Profile</button>
 </div>
 
-<script>
-    // Firebase Config
-    const firebaseConfig = {
-        databaseURL: "https://class-connect-b58f0-default-rtdb.asia-southeast1.firebasedatabase.app/"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-
-    // Local Storage for User Name
-    let currentUserName = localStorage.getItem("alumniName") || "Anonymous";
-    document.getElementById('usernameInput').value = currentUserName;
-    document.getElementById('display-name-tag').innerText = currentUserName;
-    document.getElementById('profile-initial').innerText = currentUserName.charAt(0).toUpperCase();
-
-    // Navigation Logic
-    function show(sectionId, title, element) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
-        
-        document.getElementById(sectionId).classList.add('active');
-        document.getElementById('page-title').innerText = title;
-        element.classList.add('active-nav');
-    }
-
-    // Save Profile Logic
-    function saveProfile() {
-        const newName = document.getElementById('usernameInput').value;
-        if(newName) {
-            localStorage.setItem("alumniName", newName);
-            currentUserName = newName;
-            document.getElementById('display-name-tag').innerText = newName;
-            document.getElementById('profile-initial').innerText = newName.charAt(0).toUpperCase();
-            alert("Profile Updated!");
-            show('feed', 'Home Feed', document.getElementById('btn-feed'));
-        }
-    }
-
-    // Post to Firebase
-    function sendPost() {
-        const text = document.getElementById('msgInput').value;
-        if(text) {
-            database.ref('posts').push({
-                user: currentUserName,
-                message: text,
-                timestamp: new Date().toLocaleString()
-            });
-            document.getElementById('msgInput').value = "";
-        }
-    }
-
-    // Listen for Real-time Posts
-    database.ref('posts').on('value', (snapshot) => {
-        const container = document.getElementById('post-container');
-        container.innerHTML = "";
-        const data = snapshot.val();
-        if(data) {
-            Object.values(data).reverse().forEach(post => {
-                container.innerHTML += `
-                    <div class="post-card">
-                        <p class="post-user">${post.user}</p>
-                        <p style="margin: 5px 0;">${post.message}</p>
-                        <span class="post-time">${post.timestamp}</span>
-                    </div>
-                `;
-            });
-        } else {
-            container.innerHTML = "No posts yet. Start the conversation!";
-        }
-    });
-</script>
+<script src="app.js"></script>
 
 </body>
 </html>
