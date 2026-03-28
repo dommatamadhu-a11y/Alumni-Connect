@@ -1,10 +1,9 @@
-// 1. Firebase Initialization
 const firebaseConfig = { databaseURL: "https://class-connect-b58f0-default-rtdb.asia-southeast1.firebasedatabase.app/" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// 2. Load User Session
-let user = JSON.parse(localStorage.getItem("alumniUser")) || { name: "", groupKey: "" };
+let user = JSON.parse(localStorage.getItem("alumniUser")) || { name: "" };
+let currentChatFriend = "";
 
 window.onload = () => {
     if(user.name) {
@@ -16,27 +15,20 @@ window.onload = () => {
     }
 };
 
-// 3. Navigation
 function show(id, title, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
     document.getElementById(id).classList.add('active');
     document.getElementById('page-title').innerText = title;
     el.classList.add('active-nav');
-    
-    if(id === 'friends') {
-        loadMyFriends();
-        document.getElementById('notif-dot').style.display = "none";
-    }
+    if(id === 'friends') loadMyFriends();
 }
 
-// 4. Profile Management
 function saveProfile() {
     const name = document.getElementById('p-name').value.trim();
     const inst = document.getElementById('p-inst').value.trim();
     const year = document.getElementById('p-year').value.trim();
     const city = document.getElementById('p-city').value.trim();
-    
     if(!name || !inst || !year) return alert("Fill essential details!");
 
     const groupKey = `${inst}_${year}_${city}`.replace(/\s+/g, '').toUpperCase();
@@ -47,7 +39,7 @@ function saveProfile() {
     location.reload();
 }
 
-// 5. Search Logic
+// --- SEARCH & FRIENDS ---
 function searchAlumni() {
     const sInst = document.getElementById('s-inst').value.trim().toUpperCase();
     const sYear = document.getElementById('s-year').value.trim();
@@ -57,36 +49,27 @@ function searchAlumni() {
     resDiv.innerHTML = "Searching...";
     db.ref('users').once('value', snap => {
         resDiv.innerHTML = "<h4>Search Results:</h4>";
-        let count = 0;
         snap.forEach(child => {
             const u = child.val();
             if(u.name !== user.name && (u.inst.toUpperCase() === sInst || u.year === sYear || u.city.toUpperCase() === sCity)) {
-                count++;
-                checkAndDisplay(u, resDiv);
+                checkFriendStatus(u, resDiv);
             }
         });
-        if(count === 0) resDiv.innerHTML = "No matches found.";
     });
 }
 
-function checkAndDisplay(uData, container) {
+function checkFriendStatus(uData, container) {
     db.ref('friends/' + user.name + '/' + uData.name).once('value', fSnap => {
-        let actionBtn = fSnap.exists() ? 
-            `<button class="btn btn-green" style="width:auto;" onclick="alert('Private Chat Coming Soon!')">💬 Message</button>` : 
+        let btn = fSnap.exists() ? 
+            `<button class="btn btn-green" style="width:auto;" onclick="openChat('${uData.name}')">💬 Message</button>` : 
             `<button class="btn btn-blue" style="width:auto;" onclick="sendRequest('${uData.name}')">➕ Add Friend</button>`;
-        
-        container.innerHTML += `
-            <div class="card">
-                <b>${uData.name}</b><br><small>${uData.inst} | ${uData.year}</small><br><br>
-                ${actionBtn}
-            </div>`;
+        container.innerHTML += `<div class="card"><b>${uData.name}</b><br>${btn}</div>`;
     });
 }
 
-// 6. Friend Request & Notifications
 function sendRequest(target) {
     db.ref('requests/' + target + '/' + user.name).set({ from: user.name });
-    alert("Request sent to " + target);
+    alert("Request Sent!");
 }
 
 function listenToRequests() {
@@ -98,11 +81,9 @@ function listenToRequests() {
             area.style.display = "block";
             document.getElementById('notif-dot').style.display = "block";
             snap.forEach(c => {
-                list.innerHTML += `<div class="req-box"><span>${c.key}</span><button class="btn-green" style="width:auto;" onclick="accept('${c.key}')">Accept</button></div>`;
+                list.innerHTML += `<div class="req-box"><span>${c.key}</span><button class="btn btn-green" style="width:auto;" onclick="accept('${c.key}')">Accept</button></div>`;
             });
-        } else {
-            area.style.display = "none";
-        }
+        } else { area.style.display = "none"; }
     });
 }
 
@@ -110,7 +91,6 @@ function accept(name) {
     db.ref('friends/' + user.name + '/' + name).set(true);
     db.ref('friends/' + name + '/' + user.name).set(true);
     db.ref('requests/' + user.name + '/' + name).remove();
-    alert("Connected with " + name);
 }
 
 function loadMyFriends() {
@@ -118,12 +98,54 @@ function loadMyFriends() {
     db.ref('friends/' + user.name).on('value', snap => {
         list.innerHTML = "";
         snap.forEach(c => {
-            list.innerHTML += `<div class="card"><b>👤 ${c.key}</b> <button class="btn-green" style="float:right; width:auto;" onclick="alert('Chatting with ${c.key}')">Chat</button></div>`;
+            list.innerHTML += `<div class="card"><b>👤 ${c.key}</b> <button class="btn btn-green" style="float:right; width:auto;" onclick="openChat('${c.key}')">Chat</button></div>`;
         });
     });
 }
 
-// 7. Wall Feed
+// --- PRIVATE CHAT LOGIC ---
+function openChat(friendName) {
+    currentChatFriend = friendName;
+    document.getElementById('chat-with-name').innerText = friendName;
+    document.getElementById('chat-window').style.display = "block";
+    loadPrivateMessages();
+}
+
+function closeChat() {
+    document.getElementById('chat-window').style.display = "none";
+    const chatId = getChatId(user.name, currentChatFriend);
+    db.ref('private_messages/' + chatId).off();
+}
+
+function getChatId(u1, u2) {
+    return u1 < u2 ? `${u1}_${u2}` : `${u2}_${u1}`;
+}
+
+function sendPrivateMessage() {
+    const msg = document.getElementById('privateMsgInput').value.trim();
+    if(msg && currentChatFriend) {
+        const chatId = getChatId(user.name, currentChatFriend);
+        db.ref('private_messages/' + chatId).push({ sender: user.name, text: msg });
+        document.getElementById('privateMsgInput').value = "";
+    }
+}
+
+function loadPrivateMessages() {
+    const chatId = getChatId(user.name, currentChatFriend);
+    const container = document.getElementById('chat-messages');
+    db.ref('private_messages/' + chatId).on('value', snap => {
+        container.innerHTML = "";
+        snap.forEach(c => {
+            const m = c.val();
+            const isMine = m.sender === user.name;
+            const bubble = `<div class="msg-bubble" style="align-self:${isMine?'flex-end':'flex-start'}; background:${isMine?'#dcf8c6':'white'};">${m.text}</div>`;
+            container.innerHTML += bubble;
+        });
+        container.scrollTop = container.scrollHeight;
+    });
+}
+
+// --- GROUP WALL FEED ---
 function sendPost() {
     const msg = document.getElementById('msgInput').value;
     if(msg && user.groupKey) {
