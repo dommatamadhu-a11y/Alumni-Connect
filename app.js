@@ -13,8 +13,17 @@ window.onload = () => {
         document.getElementById('p-year').value = user.year || "";
         document.getElementById('p-class').value = user.uClass || "";
         document.getElementById('p-city').value = user.city || "";
+        listenToRequests();
+        listenToChatNotifs();
     }
 };
+
+function showToast(msg, color = "#333") {
+    const x = document.getElementById("toast");
+    x.innerText = msg; x.style.backgroundColor = color;
+    x.className = "show";
+    setTimeout(() => { x.className = x.className.replace("show", ""); }, 3000);
+}
 
 function updateHeaderUI() {
     if(user) {
@@ -32,29 +41,25 @@ function show(id, title, el) {
     if(id === 'friends') loadMyFriends();
 }
 
-function previewFile(inputId, imgId) {
-    const file = document.getElementById(inputId).files[0];
-    const preview = document.getElementById(imgId);
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => { preview.src = e.target.result; preview.style.display = "block"; };
-        reader.readAsDataURL(file);
-    }
-}
-
 function saveProfile() {
     const name = document.getElementById('p-name').value.trim();
     const inst = document.getElementById('p-inst').value.trim();
     const year = document.getElementById('p-year').value.trim();
     const uClass = document.getElementById('p-class').value.trim();
     const city = document.getElementById('p-city').value.trim();
-    if(!name || !inst || !year) return alert("Fill Name, Inst, Year!");
+    
+    if(!name || !inst || !year) return alert("Fill Required Fields!");
+    
     user = { name, inst, year, uClass, city, groupKey: (inst+year).replace(/\s+/g,'').toUpperCase() };
     localStorage.setItem("alumniUser", JSON.stringify(user));
-    db.ref('users/' + name).set(user).then(() => location.reload());
+    
+    db.ref('users/' + name).set(user).then(() => {
+        showToast("✅ Profile Updated Successfully!", "#2ec4b6");
+        setTimeout(() => location.reload(), 1500);
+    });
 }
 
-// --- FEED LOGIC (LIKE & COMMENT) ---
+// --- FEED LOGIC (LIKES & COMMENTS) ---
 function handleFeedPost() {
     const text = document.getElementById('msgInput').value.trim();
     const file = document.getElementById('imageInput').files[0];
@@ -74,13 +79,13 @@ function handleFeedPost() {
 
 function savePost(msg, imageUrl) {
     db.ref('posts').push({
-        name: user.name, msg, imageUrl, groupKey: user.groupKey,
-        likes: 0,
+        name: user.name, msg, imageUrl, groupKey: user.groupKey, likes: 0,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }).then(() => {
+        showToast("Post Shared!");
         document.getElementById('msgInput').value = "";
         document.getElementById('imageInput').value = "";
-        document.getElementById('imagePreview').style.display = "none";
+        document.getElementById('preview-post').style.display = "none";
         document.getElementById('postBtn').disabled = false;
     });
 }
@@ -91,52 +96,39 @@ db.ref('posts').on('value', snap => {
         const p = c.val();
         const postId = c.key;
         if(user && p.groupKey === user.groupKey) {
-            let del = p.name === user.name ? `<button class="btn-red" style="position:absolute; right:15px;" onclick="db.ref('posts/${postId}').remove()">Delete</button>` : "";
+            let del = p.name === user.name ? `<button class="btn-red" style="float:right;" onclick="db.ref('posts/${postId}').remove()">Delete</button>` : "";
             let img = p.imageUrl ? `<img src="${p.imageUrl}" class="feed-img">` : "";
             let likes = p.likes || 0;
-            
             let comms = "";
-            if(p.comments) {
-                Object.values(p.comments).forEach(cm => {
-                    comms += `<div style="margin-bottom:4px;"><b>${cm.user}:</b> ${cm.text}</div>`;
-                });
-            }
+            if(p.comments) Object.values(p.comments).forEach(m => comms += `<div><b>${m.user}:</b> ${m.text}</div>`);
 
-            const postCard = `
+            cont.innerHTML = `
                 <div class="card">
-                    ${del}
-                    <b>${p.name}</b> <small style="color:gray;">${p.time}</small>
-                    <p style="margin:10px 0;">${p.msg || ""}</p>
-                    ${img}
+                    ${del}<b>${p.name}</b> <small style="color:gray;">${p.time}</small>
+                    <p>${p.msg || ""}</p>${img}
                     <div class="post-footer">
-                        <button class="like-btn" onclick="likePost('${postId}', ${likes})">❤️ ${likes} Likes</button>
-                        <button class="comm-btn" onclick="document.getElementById('in-${postId}').focus()">💬 Comment</button>
+                        <button class="action-btn" onclick="db.ref('posts/${postId}/likes').set(${likes+1})">❤️ ${likes} Likes</button>
+                        <button class="action-btn" onclick="document.getElementById('in-${postId}').focus()">💬 Comment</button>
                     </div>
-                    <div class="comments-list" id="list-${postId}">${comms || "No comments yet"}</div>
-                    <div class="comment-box">
-                        <input type="text" id="in-${postId}" placeholder="Add a comment..." style="margin:0; font-size:12px;">
+                    <div class="comments-area" id="c-${postId}">${comms || "No comments"}</div>
+                    <div style="display:flex; margin-top:8px; gap:5px;">
+                        <input type="text" id="in-${postId}" placeholder="Write comment..." style="margin:0; padding:5px; font-size:12px;">
                         <button class="btn-blue" style="width:auto; padding:5px 10px;" onclick="addComment('${postId}')">Post</button>
                     </div>
-                </div>`;
-            cont.innerHTML = postCard + cont.innerHTML;
+                </div>` + cont.innerHTML;
         }
     });
 });
 
-function likePost(id, count) {
-    db.ref('posts/' + id + '/likes').set(count + 1);
-}
-
 function addComment(id) {
     const input = document.getElementById('in-' + id);
-    const text = input.value.trim();
-    if(text && user) {
-        db.ref('posts/' + id + '/comments').push({ user: user.name, text: text });
+    if(input.value.trim()) {
+        db.ref('posts/' + id + '/comments').push({ user: user.name, text: input.value.trim() });
         input.value = "";
     }
 }
 
-// --- SEARCH & FRIENDS ---
+// --- FRIENDS & NOTIFICATIONS ---
 function searchAlumni() {
     const sI = document.getElementById('s-inst').value.toUpperCase();
     const sY = document.getElementById('s-year').value;
@@ -158,32 +150,69 @@ function searchAlumni() {
     });
 }
 
-function sendRequest(t) { db.ref('friends/' + user.name + '/' + t).set(true); db.ref('friends/' + t + '/' + user.name).set(true); alert("Added to friends!"); }
+function sendRequest(t) {
+    db.ref('requests/' + t + '/' + user.name).set({from: user.name}).then(() => showToast("📩 Request Sent to " + t));
+}
+
+function listenToRequests() {
+    db.ref('requests/' + user.name).on('value', snap => {
+        const dot = document.getElementById('friend-dot');
+        const area = document.getElementById('req-area');
+        const list = document.getElementById('req-list');
+        if(snap.exists()) {
+            dot.style.display = "block"; area.style.display = "block"; list.innerHTML = "";
+            snap.forEach(c => {
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span><b>${c.key}</b></span><button class="btn btn-blue" style="width:auto; padding:5px 10px;" onclick="accept('${c.key}')">Accept</button>
+                </div>`;
+            });
+        } else { dot.style.display = "none"; area.style.display = "none"; }
+    });
+}
+
+function accept(n) {
+    db.ref('friends/'+user.name+'/'+n).set(true);
+    db.ref('friends/'+n+'/'+user.name).set(true);
+    db.ref('requests/'+user.name+'/'+n).remove().then(() => {
+        showToast("🤝 Added " + n + " as friend!");
+        db.ref('chat_notifications/' + n + '/' + user.name).set("accepted");
+    });
+}
 
 function loadMyFriends() {
     db.ref('friends/' + user.name).on('value', snap => {
         const l = document.getElementById('my-friends-list'); l.innerHTML = "<h4>My Friends</h4>";
-        snap.forEach(c => {
-            l.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>👤 ${c.key}</b><button class="btn btn-blue" style="width:auto; padding:5px 15px;" onclick="openChat('${c.key}')">Chat</button></div>`;
-        });
+        snap.forEach(c => l.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>👤 ${c.key}</b><button class="btn btn-blue" style="width:auto; padding:5px 15px;" onclick="openChat('${c.key}')">Chat</button></div>`);
     });
 }
 
-// --- CHAT LOGIC ---
+function listenToChatNotifs() {
+    db.ref('chat_notifications/' + user.name).on('value', snap => {
+        const dot = document.getElementById('settings-dot'); // Using settings dot for general alerts
+        if(snap.exists()) {
+            dot.style.display = "block";
+            snap.forEach(c => {
+                if(c.val() === "new_msg") showToast("💬 New message from " + c.key, "#4361ee");
+                if(c.val() === "accepted") showToast("🎉 " + c.key + " accepted your request!", "#2ec4b6");
+            });
+        } else dot.style.display = "none";
+    });
+}
+
 function openChat(f) {
     currentChatFriend = f;
     document.getElementById('chat-with-name').innerText = f;
     document.getElementById('chat-window').style.display = "flex";
+    db.ref('chat_notifications/' + user.name + '/' + f).remove();
     loadMessages();
 }
 
-function closeChat() { document.getElementById('chat-window').style.display = "none"; }
-
 function sendPrivateMessage() {
     const msg = document.getElementById('privateMsgInput').value.trim();
-    if(!msg || !currentChatFriend) return;
+    if(!msg) return;
     const chatId = user.name < currentChatFriend ? `${user.name}_${currentChatFriend}` : `${currentChatFriend}_${user.name}`;
     db.ref('private_messages/' + chatId).push({ sender: user.name, text: msg, time: new Date().toLocaleTimeString() });
+    db.ref('chat_notifications/' + currentChatFriend + '/' + user.name).set("new_msg");
     document.getElementById('privateMsgInput').value = "";
 }
 
@@ -199,4 +228,17 @@ function loadMessages() {
     });
 }
 
+function previewFile(inputId, imgId) {
+    const file = document.getElementById(inputId).files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => { 
+            const img = document.getElementById(imgId);
+            img.src = e.target.result; img.style.display = "block"; 
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function closeChat() { document.getElementById('chat-window').style.display = "none"; }
 function logout() { localStorage.clear(); location.reload(); }
