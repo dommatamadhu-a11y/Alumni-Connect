@@ -1,43 +1,84 @@
-const firebaseConfig = { databaseURL: "https://class-connect-b58f0-default-rtdb.asia-southeast1.firebasedatabase.app/" };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+/**
+ * Alumni Connect Pro - Global Connectivity & Mental Well-being
+ * Core Logic with Firebase Authentication & Real-time Database
+ */
 
-let user = JSON.parse(localStorage.getItem("alumniUser")) || null;
-let currentChatFriend = "";
-
-window.onload = () => {
-    updateHeaderUI();
-    if(user && user.name) {
-        fillInputs();
-        trackOnlineStatus();
-        listenToRequests();
-        listenToChatNotifs();
-    }
+// Firebase Configuration
+const firebaseConfig = { 
+    databaseURL: "https://class-connect-b58f0-default-rtdb.asia-southeast1.firebasedatabase.app/" 
 };
 
-// --- CORE UTILS ---
-function showToast(msg, color = "#333") {
-    const x = document.getElementById("toast");
-    x.innerText = msg; x.style.backgroundColor = color;
-    x.className = "show";
-    setTimeout(() => { x.className = x.className.replace("show", ""); }, 3000);
-}
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+const provider = new firebase.auth.GoogleAuthProvider();
 
-function updateHeaderUI() {
-    if(user) {
-        document.getElementById('header-user-name').innerText = "👤 " + user.name;
-        document.getElementById('header-group-tag').innerText = "🎓 " + user.inst;
+let user = null;
+let currentChatFriendUID = "";
+
+/**
+ * Monitor Authentication State
+ * Ensures high security by verifying user identity via Google
+ */
+auth.onAuthStateChanged((u) => {
+    const loginOverlay = document.getElementById('login-overlay');
+    if (u) {
+        loginOverlay.style.display = "none";
+        
+        // Fetch user profile from Database using UID (Unique ID for Privacy)
+        db.ref('users/' + u.uid).once('value', snap => {
+            const data = snap.val();
+            user = {
+                uid: u.uid,
+                name: u.displayName,
+                email: u.email,
+                photo: u.photoURL,
+                inst: data ? data.inst : "",
+                year: data ? data.year : "",
+                groupKey: data ? (data.inst + data.year).replace(/\s+/g,'').toUpperCase() : ""
+            };
+            
+            updateUI();
+            trackOnlineStatus();
+            listenToRequests();
+            listenToChatNotifs();
+        });
+    } else {
+        loginOverlay.style.display = "flex";
     }
+});
+
+/**
+ * Google Sign-In Handler
+ */
+function loginWithGoogle() {
+    auth.signInWithPopup(provider).catch(err => {
+        console.error("Auth Error:", err);
+        showToast("Login Failed: " + err.message, "#ff4d6d");
+    });
 }
 
-function fillInputs() {
-    document.getElementById('p-name').value = user.name || "";
+/**
+ * Update UI Elements with User Data
+ */
+function updateUI() {
+    if(!user) return;
+    document.getElementById('header-user-name').innerText = user.name;
+    document.getElementById('header-user-img').src = user.photo;
+    document.getElementById('header-group-tag').innerText = user.inst ? "🎓 " + user.inst : "Setup Profile";
+    
+    // Settings Page Info
+    document.getElementById('p-img-large').src = user.photo;
+    document.getElementById('p-name-display').innerText = user.name;
+    document.getElementById('p-email-display').innerText = user.email;
     document.getElementById('p-inst').value = user.inst || "";
     document.getElementById('p-year').value = user.year || "";
-    document.getElementById('p-class').value = user.uClass || "";
-    document.getElementById('p-city').value = user.city || "";
 }
 
+/**
+ * UI Navigation Logic
+ */
 function show(id, title, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
@@ -47,232 +88,288 @@ function show(id, title, el) {
     if(id === 'friends') loadMyFriends();
 }
 
-// --- ONLINE STATUS LOGIC ---
-function trackOnlineStatus() {
-    const statusRef = db.ref('status/' + user.name);
-    db.ref('.info/connected').on('value', snap => {
-        if(snap.val() === false) return;
-        statusRef.onDisconnect().set({ state: 'offline' }).then(() => {
-            statusRef.set({ state: 'online' });
-        });
-    });
+/**
+ * Toast Notifications
+ */
+function showToast(msg, color = "#333") {
+    const x = document.getElementById("toast");
+    x.innerText = msg; 
+    x.style.backgroundColor = color;
+    x.className = "show";
+    setTimeout(() => x.className = "", 3000);
 }
 
-// --- PROFILE & SETTINGS ---
+/**
+ * Update Profile to Database
+ */
 function saveProfile() {
-    const name = document.getElementById('p-name').value.trim();
     const inst = document.getElementById('p-inst').value.trim();
     const year = document.getElementById('p-year').value.trim();
-    const uClass = document.getElementById('p-class').value.trim();
     const city = document.getElementById('p-city').value.trim();
-    if(!name || !inst || !year) return alert("Fill Name, Inst, Year!");
 
-    user = { name, inst, year, uClass, city, groupKey: (inst+year).replace(/\s+/g,'').toUpperCase() };
-    localStorage.setItem("alumniUser", JSON.stringify(user));
-    db.ref('users/' + name).set(user).then(() => {
-        showToast("✅ Profile Updated!", "#2ec4b6");
+    if(!inst || !year) return showToast("Please fill Institution & Year");
+
+    db.ref('users/' + user.uid).update({
+        inst, year, city,
+        name: user.name,
+        photo: user.photo,
+        lastUpdated: firebase.database.ServerValue.TIMESTAMP
+    }).then(() => {
+        showToast("✅ Profile Synced Successfully!", "#2ec4b6");
         setTimeout(() => location.reload(), 1000);
     });
 }
 
-// --- FEED (LIKES & COMMENTS) ---
+/**
+ * Feed Logic - Share Memories
+ */
 function handleFeedPost() {
     const text = document.getElementById('msgInput').value.trim();
     const file = document.getElementById('imageInput').files[0];
-    if(!user) return alert("Setup profile first!");
-    const btn = document.getElementById('postBtn');
-    btn.disabled = true;
+    
+    if(!user.inst) return showToast("Please update profile first!");
+
+    const postData = {
+        uid: user.uid,
+        name: user.name,
+        photo: user.photo,
+        msg: text,
+        groupKey: user.groupKey,
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    };
 
     if(file) {
         const reader = new FileReader();
-        reader.onload = () => savePost(text, reader.result);
+        reader.onload = () => { 
+            postData.imageUrl = reader.result; 
+            savePostToFirebase(postData); 
+        };
         reader.readAsDataURL(file);
-    } else {
-        if(!text) { btn.disabled = false; return; }
-        savePost(text, null);
+    } else if(text) {
+        savePostToFirebase(postData);
     }
 }
 
-function savePost(msg, imageUrl) {
-    db.ref('posts').push({
-        name: user.name, msg, imageUrl, groupKey: user.groupKey, likes: 0,
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
-    }).then(() => {
-        showToast("Post Shared!");
+function savePostToFirebase(data) {
+    db.ref('posts').push(data).then(() => {
         document.getElementById('msgInput').value = "";
         document.getElementById('imageInput').value = "";
         document.getElementById('preview-post').style.display = "none";
-        document.getElementById('postBtn').disabled = false;
+        showToast("Memory Shared! ❤️", "#4361ee");
     });
 }
 
-db.ref('posts').on('value', snap => {
-    const cont = document.getElementById('post-container'); cont.innerHTML = "";
-    snap.forEach(c => {
-        const p = c.val(); const postId = c.key;
-        if(user && p.groupKey === user.groupKey) {
-            let del = p.name === user.name ? `<button class="btn-red" style="float:right;" onclick="db.ref('posts/${postId}').remove()">Delete</button>` : "";
-            let img = p.imageUrl ? `<img src="${p.imageUrl}" class="feed-img">` : "";
-            let likes = p.likes || 0;
-            let comms = "";
-            if(p.comments) Object.values(p.comments).forEach(m => comms += `<div><b>${m.user}:</b> ${m.text}</div>`);
-
-            cont.innerHTML = `
+// Real-time Feed Listener
+db.ref('posts').limitToLast(50).on('value', snap => {
+    const container = document.getElementById('post-container'); 
+    container.innerHTML = "";
+    snap.forEach(child => {
+        const post = child.val();
+        if(user && post.groupKey === user.groupKey) {
+            let imgHtml = post.imageUrl ? `<img src="${post.imageUrl}" class="feed-img">` : "";
+            container.innerHTML = `
                 <div class="card">
-                    ${del}<b>${p.name}</b> <small style="color:gray;">${p.time}</small>
-                    <p>${p.msg || ""}</p>${img}
-                    <div class="post-footer">
-                        <button class="action-btn" onclick="db.ref('posts/${postId}/likes').set(${likes+1})">❤️ ${likes}</button>
-                        <button class="action-btn" onclick="document.getElementById('in-${postId}').focus()">💬 Comment</button>
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                        <img src="${post.photo}" style="width:32px; height:32px; border-radius:50%;">
+                        <div>
+                            <div style="font-weight:bold; font-size:14px;">${post.name}</div>
+                            <small style="color:gray;">${post.time}</small>
+                        </div>
                     </div>
-                    <div class="comments-area">${comms || "No comments"}</div>
-                    <div style="display:flex; margin-top:8px; gap:5px;">
-                        <input type="text" id="in-${postId}" placeholder="Add comment..." style="margin:0; padding:5px; font-size:12px;">
-                        <button class="btn-blue" style="width:auto; padding:5px 10px;" onclick="addComment('${postId}')">Post</button>
-                    </div>
-                </div>` + cont.innerHTML;
+                    <p style="margin:5px 0; line-height:1.4;">${post.msg || ""}</p>
+                    ${imgHtml}
+                </div>` + container.innerHTML;
         }
     });
 });
 
-function addComment(id) {
-    const input = document.getElementById('in-' + id);
-    if(input.value.trim()) {
-        db.ref('posts/' + id + '/comments').push({ user: user.name, text: input.value.trim() });
-        input.value = "";
-    }
-}
-
-// --- FRIENDS & SEARCH ---
+/**
+ * Friends & Discovery Logic
+ */
 function searchAlumni() {
-    const sI = document.getElementById('s-inst').value.toUpperCase();
-    const sY = document.getElementById('s-year').value;
-    const sC = document.getElementById('s-city').value.toUpperCase();
-    const sCl = document.getElementById('s-class').value.toUpperCase();
-    const res = document.getElementById('search-results'); res.innerHTML = "Searching...";
+    const inst = document.getElementById('s-inst').value.toUpperCase();
+    const year = document.getElementById('s-year').value;
+    const res = document.getElementById('my-friends-list'); 
+    res.innerHTML = "Searching...";
 
     db.ref('users').once('value', snap => {
-        res.innerHTML = "";
-        snap.forEach(c => {
-            const u = c.val();
-            if(u.name !== user.name && (u.inst.toUpperCase().includes(sI) || u.year === sY || (u.city && u.city.toUpperCase().includes(sC)) || (u.uClass && u.uClass.toUpperCase().includes(sCl)))) {
-                res.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                    <div><b>${u.name}</b><br><small>${u.uClass || ''} | ${u.city || ''}</small></div>
-                    <button class="btn btn-blue" style="width:auto; padding:5px 15px;" onclick="sendRequest('${u.name}')">Add</button>
-                </div>`;
+        res.innerHTML = "<h4>Discovery Results</h4>";
+        snap.forEach(child => {
+            const u = child.val();
+            const uid = child.key;
+            if(uid !== user.uid && (u.inst?.toUpperCase().includes(inst) || u.year === year)) {
+                res.innerHTML += `
+                    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <img src="${u.photo}" style="width:35px; height:35px; border-radius:50%;">
+                            <b>${u.name}</b>
+                        </div>
+                        <button class="btn btn-blue" style="width:auto; padding:6px 15px;" onclick="sendRequest('${uid}', '${u.name}')">Add</button>
+                    </div>`;
             }
         });
     });
 }
 
-function sendRequest(t) {
-    db.ref('requests/' + t + '/' + user.name).set({from: user.name}).then(() => showToast("📩 Request Sent!"));
+function sendRequest(targetUid, targetName) {
+    db.ref('requests/' + targetUid + '/' + user.uid).set({ 
+        name: user.name, 
+        photo: user.photo 
+    }).then(() => showToast("📩 Friend Request Sent!", "#4361ee"));
 }
 
 function listenToRequests() {
-    db.ref('requests/' + user.name).on('value', snap => {
+    db.ref('requests/' + user.uid).on('value', snap => {
         const dot = document.getElementById('friend-dot');
         const area = document.getElementById('req-area');
         const list = document.getElementById('req-list');
         if(snap.exists()) {
-            dot.style.display = "block"; area.style.display = "block"; list.innerHTML = "";
-            snap.forEach(c => {
-                list.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <span><b>${c.key}</b></span><button class="btn btn-blue" style="width:auto; padding:5px 10px;" onclick="accept('${c.key}')">Accept</button>
-                </div>`;
+            dot.style.display = "block"; 
+            area.style.display = "block"; 
+            list.innerHTML = "";
+            snap.forEach(child => {
+                const req = child.val();
+                list.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <img src="${req.photo}" style="width:25px; height:25px; border-radius:50%;">
+                            <span><b>${req.name}</b></span>
+                        </div>
+                        <button class="btn btn-blue" style="width:auto; padding:5px 12px; font-size:12px;" onclick="acceptRequest('${child.key}', '${req.name}')">Accept</button>
+                    </div>`;
             });
-        } else { dot.style.display = "none"; area.style.display = "none"; }
+        } else { 
+            dot.style.display = "none"; 
+            area.style.display = "none"; 
+        }
     });
 }
 
-function accept(n) {
-    db.ref('friends/'+user.name+'/'+n).set(true);
-    db.ref('friends/'+n+'/'+user.name).set(true);
-    db.ref('requests/'+user.name+'/'+n).remove().then(() => {
-        showToast("🤝 Added Friend!");
-        db.ref('chat_notifications/' + n + '/' + user.name).set("accepted");
+function acceptRequest(fUid, fName) {
+    db.ref('friends/'+user.uid+'/'+fUid).set({ name: fName });
+    db.ref('friends/'+fUid+'/'+user.uid).set({ name: user.name });
+    db.ref('requests/'+user.uid+'/'+fUid).remove().then(() => {
+        showToast("🤝 Connected with " + fName, "#2ec4b6");
     });
 }
 
 function loadMyFriends() {
-    db.ref('friends/' + user.name).on('value', snap => {
-        const l = document.getElementById('my-friends-list'); l.innerHTML = "<h4>My Friends</h4>";
-        snap.forEach(c => {
-            const fName = c.key;
-            const fId = `st-${fName.replace(/\s+/g,'')}`;
-            l.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                <b>👤 ${fName} <span id="${fId}" style="font-size:10px;"></span></b>
-                <button class="btn btn-blue" style="width:auto; padding:5px 15px;" onclick="openChat('${fName}')">Chat</button>
-            </div>`;
-            db.ref('status/' + fName).on('value', sSnap => {
-                const s = sSnap.val();
-                const el = document.getElementById(fId);
-                if(el) {
-                    el.innerText = (s && s.state === 'online') ? "● Online" : "";
-                    el.style.color = (s && s.state === 'online') ? "#2ec4b6" : "transparent";
+    db.ref('friends/' + user.uid).on('value', snap => {
+        const container = document.getElementById('my-friends-list'); 
+        container.innerHTML = "<h4>My Connections</h4>";
+        snap.forEach(child => {
+            const fUid = child.key;
+            const fData = child.val();
+            container.innerHTML += `
+                <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                    <b>👤 ${fData.name} <span id="st-${fUid}" style="font-size:10px; margin-left:5px;"></span></b>
+                    <button class="btn btn-blue" style="width:auto; padding:6px 18px;" onclick="openChat('${fUid}', '${fData.name}')">Chat</button>
+                </div>`;
+            
+            // Listen for Friend's Online Status
+            db.ref('status/' + fUid).on('value', statusSnap => {
+                const statusEl = document.getElementById('st-'+fUid);
+                if(statusEl) {
+                    const isOnline = statusSnap.val()?.state === 'online';
+                    statusEl.innerText = isOnline ? "● Online" : "";
+                    statusEl.style.color = isOnline ? "#2ec4b6" : "transparent";
                 }
             });
         });
     });
 }
 
-// --- CHAT & NOTIFICATIONS ---
-function openChat(f) {
-    currentChatFriend = f;
+/**
+ * Privacy-focused Chat & Online Status
+ */
+function trackOnlineStatus() {
+    const statusRef = db.ref('status/' + user.uid);
+    db.ref('.info/connected').on('value', snap => {
+        if(!snap.val()) return;
+        statusRef.onDisconnect().set({ 
+            state: 'offline', 
+            lastSeen: firebase.database.ServerValue.TIMESTAMP 
+        }).then(() => {
+            statusRef.set({ state: 'online' });
+        });
+    });
+}
+
+function openChat(fUid, fName) {
+    currentChatFriendUID = fUid;
     const title = document.getElementById('chat-with-name');
     document.getElementById('chat-window').style.display = "flex";
-    db.ref('status/' + f).on('value', snap => {
+    
+    db.ref('status/' + fUid).on('value', snap => {
         const s = snap.val();
-        title.innerHTML = (s && s.state === 'online') ? `${f} <br><small style="color:#2ec4b6;">● Online</small>` : `${f} <br><small style="color:gray;">Offline</small>`;
+        title.innerHTML = (s?.state === 'online') 
+            ? `${fName} <br><small style="color:#2ec4b6;">● Active Now</small>` 
+            : `${fName} <br><small style="color:gray;">Offline</small>`;
     });
-    db.ref('chat_notifications/' + user.name + '/' + f).remove();
+
+    db.ref('chat_notifications/' + user.uid + '/' + fUid).remove();
     loadMessages();
 }
 
 function sendPrivateMessage() {
     const msg = document.getElementById('privateMsgInput').value.trim();
     if(!msg) return;
-    const chatId = user.name < currentChatFriend ? `${user.name}_${currentChatFriend}` : `${currentChatFriend}_${user.name}`;
-    db.ref('private_messages/' + chatId).push({ sender: user.name, text: msg, time: new Date().toLocaleTimeString() });
-    db.ref('chat_notifications/' + currentChatFriend + '/' + user.name).set("new_msg");
+    
+    const chatId = user.uid < currentChatFriendUID ? `${user.uid}_${currentChatFriendUID}` : `${currentChatFriendUID}_${user.uid}`;
+    
+    db.ref('private_messages/' + chatId).push({ 
+        sender: user.uid, 
+        text: msg,
+        timestamp: firebase.database.ServerValue.TIMESTAMP 
+    });
+    
+    db.ref('chat_notifications/' + currentChatFriendUID + '/' + user.uid).set("new_msg");
     document.getElementById('privateMsgInput').value = "";
 }
 
 function loadMessages() {
-    const chatId = user.name < currentChatFriend ? `${user.name}_${currentChatFriend}` : `${currentChatFriend}_${user.name}`;
+    const chatId = user.uid < currentChatFriendUID ? `${user.uid}_${currentChatFriendUID}` : `${currentChatFriendUID}_${user.uid}`;
     db.ref('private_messages/' + chatId).on('value', snap => {
-        const c = document.getElementById('chat-messages'); c.innerHTML = "";
-        snap.forEach(s => {
-            const m = s.val();
-            c.innerHTML += `<div class="msg-bubble ${m.sender===user.name?'mine':'theirs'}">${m.text}</div>`;
+        const container = document.getElementById('chat-messages'); 
+        container.innerHTML = "";
+        snap.forEach(child => {
+            const m = child.val();
+            container.innerHTML += `<div class="msg-bubble ${m.sender===user.uid?'mine':'theirs'}">${m.text}</div>`;
         });
-        c.scrollTop = c.scrollHeight;
+        container.scrollTop = container.scrollHeight;
     });
 }
 
 function listenToChatNotifs() {
-    db.ref('chat_notifications/' + user.name).on('value', snap => {
-        const dot = document.getElementById('settings-dot');
-        if(snap.exists()) {
-            dot.style.display = "block";
-            snap.forEach(c => {
-                if(c.val() === "new_msg") showToast("💬 Message from " + c.key, "#4361ee");
-            });
-        } else dot.style.display = "none";
+    db.ref('chat_notifications/' + user.uid).on('value', snap => {
+        if(snap.exists()) showToast("💬 New Private Message Received!");
     });
 }
 
+/**
+ * Utility Functions
+ */
 function previewFile(inputId, imgId) {
     const file = document.getElementById(inputId).files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = (e) => { 
             const img = document.getElementById(imgId);
-            img.src = e.target.result; img.style.display = "block"; 
+            img.src = e.target.result; 
+            img.style.display = "block"; 
         };
         reader.readAsDataURL(file);
     }
 }
 
-function closeChat() { document.getElementById('chat-window').style.display = "none"; }
-function logout() { localStorage.clear(); location.reload(); }
+function closeChat() { 
+    document.getElementById('chat-window').style.display = "none"; 
+}
+
+function logout() { 
+    auth.signOut().then(() => { 
+        localStorage.clear(); 
+        location.reload(); 
+    }); 
+}
