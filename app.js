@@ -1,34 +1,42 @@
+// Firebase Configuration
 const firebaseConfig = { databaseURL: "https://class-connect-b58f0-default-rtdb.asia-southeast1.firebasedatabase.app/" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let user = JSON.parse(localStorage.getItem("alumniUser")) || { name: "" };
+// Load User Data
+let user = JSON.parse(localStorage.getItem("alumniUser")) || null;
 let currentChatFriend = "";
 
 window.onload = () => {
-    updateHeader();
-    if(user.name) {
-        document.getElementById('p-name').value = user.name;
-        document.getElementById('p-inst').value = user.inst;
-        document.getElementById('p-year').value = user.year;
-        document.getElementById('p-city').value = user.city;
+    updateHeaderUI();
+    if(user && user.name) {
+        document.getElementById('p-name').value = user.name || "";
+        document.getElementById('p-inst').value = user.inst || "";
+        document.getElementById('p-year').value = user.year || "";
+        document.getElementById('p-city').value = user.city || "";
         listenToRequests();
         listenForChatNotifications();
     }
 };
 
-function updateHeader() {
+// --- HEADER UI UPDATER ---
+function updateHeaderUI() {
     const nameLabel = document.getElementById('header-user-name');
     const groupLabel = document.getElementById('header-group-tag');
-    if(user.name) {
+    
+    if(user && user.name) {
         nameLabel.innerText = "👤 Login as: " + user.name;
-        groupLabel.innerText = user.inst ? "🎓 " + user.inst : "No Group";
+        groupLabel.innerText = user.inst ? "🎓 " + user.inst : "Setup Profile";
+    } else {
+        nameLabel.innerText = "Guest Mode";
+        groupLabel.innerText = "Please Login";
     }
 }
 
 function logout() {
-    if(confirm("Logout?")) {
+    if(confirm("Logout from app?")) {
         localStorage.removeItem("alumniUser");
+        user = null;
         location.reload();
     }
 }
@@ -47,39 +55,49 @@ function saveProfile() {
     const inst = document.getElementById('p-inst').value.trim();
     const year = document.getElementById('p-year').value.trim();
     const city = document.getElementById('p-city').value.trim();
-    if(!name || !inst || !year) return alert("Fill details!");
+    
+    if(!name || !inst || !year) return alert("Please enter Name, School and Year!");
 
     const groupKey = `${inst}_${year}_${city}`.replace(/\s+/g, '').toUpperCase();
     user = { name, inst, year, city, groupKey };
+    
+    // Save to LocalStorage and Firebase
     localStorage.setItem("alumniUser", JSON.stringify(user));
-    db.ref('users/' + name).set(user);
-    alert("Saved!");
-    location.reload();
+    db.ref('users/' + name).set(user).then(() => {
+        alert("Profile Saved Successfully!");
+        updateHeaderUI();
+        location.reload();
+    });
 }
 
-// Search
+// --- SEARCH & FRIENDS ---
 function searchAlumni() {
+    if(!user) return alert("Please setup profile first!");
     const sInst = document.getElementById('s-inst').value.trim().toUpperCase();
     const sYear = document.getElementById('s-year').value.trim();
     const resDiv = document.getElementById('search-results');
     resDiv.innerHTML = "Searching...";
+    
     db.ref('users').once('value', snap => {
         resDiv.innerHTML = "";
+        let found = false;
         snap.forEach(child => {
             const u = child.val();
             if(u.name !== user.name && (u.inst.toUpperCase() === sInst || u.year === sYear)) {
+                found = true;
                 db.ref('friends/' + user.name + '/' + u.name).once('value', fSnap => {
-                    let btn = fSnap.exists() ? `<button class="btn btn-green" style="width:auto;" onclick="openChat('${u.name}')">Chat</button>` : `<button class="btn btn-blue" style="width:auto;" onclick="sendRequest('${u.name}')">Add</button>`;
-                    resDiv.innerHTML += `<div class="card"><b>${u.name}</b><br>${btn}</div>`;
+                    let btn = fSnap.exists() ? `<button class="btn btn-green" style="width:auto;" onclick="openChat('${u.name}')">Chat</button>` : `<button class="btn btn-blue" style="width:auto;" onclick="sendRequest('${u.name}')">Add Friend</button>`;
+                    resDiv.innerHTML += `<div class="card"><b>${u.name}</b><br><small>${u.inst}</small><br>${btn}</div>`;
                 });
             }
         });
+        if(!found) resDiv.innerHTML = "No matches found.";
     });
 }
 
 function sendRequest(target) {
     db.ref('requests/' + target + '/' + user.name).set({ from: user.name });
-    alert("Sent!");
+    alert("Friend request sent!");
 }
 
 function listenToRequests() {
@@ -91,7 +109,7 @@ function listenToRequests() {
             area.style.display = "block";
             document.getElementById('notif-dot').style.display = "block";
             snap.forEach(c => {
-                list.innerHTML += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${c.key}</span><button onclick="accept('${c.key}')">Accept</button></div>`;
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;"><span>${c.key}</span><button class="btn-green" style="width:auto; padding:5px;" onclick="accept('${c.key}')">Accept</button></div>`;
             });
         } else area.style.display = "none";
     });
@@ -104,16 +122,17 @@ function accept(name) {
 }
 
 function loadMyFriends() {
+    if(!user) return;
     const list = document.getElementById('my-friends-list');
     db.ref('friends/' + user.name).on('value', snap => {
         list.innerHTML = "";
         snap.forEach(c => {
-            list.innerHTML += `<div class="card"><b>${c.key}</b><button class="btn btn-green" style="float:right; width:auto;" onclick="openChat('${c.key}')">Chat</button></div>`;
+            list.innerHTML += `<div class="card"><b>👤 ${c.key}</b><button class="btn btn-green" style="float:right; width:auto;" onclick="openChat('${c.key}')">Chat</button></div>`;
         });
     });
 }
 
-// Chat
+// --- CHAT LOGIC ---
 function openChat(friendName) {
     currentChatFriend = friendName;
     document.getElementById('chat-with-name').innerText = friendName;
@@ -157,13 +176,13 @@ function loadPrivateMessages() {
     });
 }
 
-// Feed
+// --- WALL FEED ---
 function sendPost() {
     const msg = document.getElementById('msgInput').value;
-    if(msg && user.groupKey) {
+    if(msg && user && user.groupKey) {
         db.ref('posts').push({ name: user.name, msg, groupKey: user.groupKey, time: new Date().toLocaleTimeString() });
         document.getElementById('msgInput').value = "";
-    }
+    } else alert("Setup profile to post!");
 }
 
 db.ref('posts').on('value', snap => {
@@ -171,7 +190,7 @@ db.ref('posts').on('value', snap => {
     cont.innerHTML = "";
     snap.forEach(c => {
         const p = c.val();
-        if(p.groupKey === user.groupKey) {
+        if(user && p.groupKey === user.groupKey) {
             let del = p.name === user.name ? `<button class="btn-red" onclick="db.ref('posts/${c.key}').remove()">Delete</button>` : "";
             cont.innerHTML = `<div class="card">${del}<b>${p.name}</b><br><p>${p.msg}</p><small>${p.time}</small></div>` + cont.innerHTML;
         }
