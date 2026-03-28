@@ -18,32 +18,30 @@
         .section { display: none; padding: 20px; max-width: 500px; margin: auto; animation: fadeIn 0.4s ease; }
         .active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .card { background: var(--white); padding: 18px; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.04); margin-bottom: 20px; border: 1px solid rgba(0,0,0,0.02); }
+        .card { background: var(--white); padding: 18px; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.04); margin-bottom: 20px; border: 1px solid rgba(0,0,0,0.02); overflow: hidden; }
         input, textarea { width: 100%; padding: 12px 15px; margin: 10px 0; border: 1.5px solid #edf2f7; border-radius: 12px; box-sizing: border-box; font-size: 14px; background: #fcfdfe; }
         .btn { border: none; padding: 12px; border-radius: 12px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.3s; font-size: 14px; }
-        .btn-blue { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(67, 97, 238, 0.2); }
-        .btn-green { background: var(--success); color: white; margin-top: 8px; }
+        .btn-blue { background: var(--primary); color: white; }
+        .btn-blue:disabled { background: #a0aec0; }
         .btn-red { background: #ff4d6d; color: white; width: auto; padding: 6px 12px; font-size: 11px; border-radius: 8px; float: right; }
-        .btn-logout { background: #f1f3f5; color: #fa5252; margin-top: 25px; border: 1px solid #ffe3e3; }
         .nav-bar { position: fixed; bottom: 0; width: 100%; background: rgba(255,255,255,0.9); display: flex; justify-content: space-around; padding: 12px 0; backdrop-filter: blur(10px); border-top: 1px solid rgba(0,0,0,0.05); z-index: 1000; }
-        .nav-item { border: none; background: none; color: var(--light-text); font-size: 11px; position: relative; cursor: pointer; text-align: center; }
+        .nav-item { border: none; background: none; color: var(--light-text); font-size: 11px; cursor: pointer; text-align: center; }
         .active-nav { color: var(--primary); transform: translateY(-3px); }
         .dot { height: 10px; width: 10px; background-color: #ff4d6d; border-radius: 50%; display: none; position: absolute; top: -4px; right: 2px; border: 2px solid white; }
         #chat-window { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:2000; animation: slideUp 0.3s ease; }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        #chat-messages { height:calc(100% - 140px); overflow-y:auto; padding:20px; display:flex; flex-direction:column; background: #f0f2f5; }
+        #chat-messages { height:calc(100% - 140px); overflow-y:auto; padding:20px; display:flex; flex-direction:column; }
         .msg-bubble { padding: 10px 15px; border-radius: 18px; margin-bottom: 8px; max-width: 80%; font-size: 14px; }
-        .mine { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
-        .theirs { align-self: flex-start; background: white; color: var(--text); border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        /* Notification Request UI */
-        #notif-banner { background: #fff3cd; padding: 10px; font-size: 13px; text-align: center; display: none; border-bottom: 1px solid #ffeeba; }
+        .mine { align-self: flex-end; background: var(--primary); color: white; }
+        .theirs { align-self: flex-start; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .feed-img { width: 100%; border-radius: 12px; margin: 10px 0; display: block; }
+        .image-preview { width: 60px; height: 60px; border-radius: 8px; display: none; object-fit: cover; border: 2px solid var(--primary); }
     </style>
 </head>
 <body>
 
 <div class="header-container">
-    <div id="notif-banner">
-        Enable Notifications for chat alerts! <button onclick="requestNotificationPermission()" style="background:var(--primary); color:white; border:none; padding:3px 8px; border-radius:5px;">Enable</button>
+    <div id="notif-banner" style="display:none; background:#fff3cd; padding:10px; text-align:center; font-size:12px;">
+        Enable Notifications for Alerts! <button onclick="requestNotificationPermission()" style="background:var(--primary); color:white; border:none; padding:3px 8px; border-radius:5px;">Enable</button>
     </div>
     <div class="user-bar">
         <span id="header-user-name">Guest Mode</span>
@@ -56,20 +54,27 @@
 
 <div id="feed" class="section active">
     <div class="card">
-        <textarea id="msgInput" rows="2" placeholder="Share with group..."></textarea>
-        <button class="btn btn-blue" onclick="sendPost()">Post to Wall</button>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <textarea id="msgInput" rows="2" placeholder="Write something or share a photo..." style="margin:0;"></textarea>
+            <img id="imagePreview" class="image-preview">
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:10px;">
+            <label for="imageInput" style="cursor:pointer; font-size:22px;">🖼️</label>
+            <input type="file" id="imageInput" accept="image/*" style="display:none;" onchange="previewImage()">
+            <button id="postBtn" class="btn btn-blue" style="flex:1;" onclick="handlePostSubmission()">Post to Wall</button>
+        </div>
     </div>
-    <div id="post-container"></div>
+    <div id="post-container">Loading...</div>
 </div>
 
 <div id="friends" class="section">
-    <div id="notifications-area" class="card" style="display:none; border-left: 4px solid var(--primary);">
+    <div id="notifications-area" class="card" style="display:none; border-left:4px solid var(--primary);">
         <h4 style="margin:0 0 10px 0;">New Requests</h4>
         <div id="request-list"></div>
     </div>
     <div class="card">
         <h4>🔍 Find Alumni</h4>
-        <input type="text" id="s-inst" placeholder="School Name">
+        <input type="text" id="s-inst" placeholder="School/College">
         <input type="text" id="s-year" placeholder="Year">
         <button class="btn btn-blue" onclick="searchAlumni()">Search</button>
     </div>
@@ -80,27 +85,19 @@
 <div id="profile" class="section">
     <div class="card">
         <h3>Settings</h3>
-        <input type="text" id="p-name" placeholder="Name">
+        <input type="text" id="p-name" placeholder="Your Name">
         <input type="text" id="p-inst" placeholder="Institution">
         <input type="text" id="p-year" placeholder="Year">
         <input type="text" id="p-city" placeholder="City">
         <button class="btn btn-blue" onclick="saveProfile()">Save Profile</button>
-        <button class="btn btn-logout" onclick="logout()">Logout</button>
+        <button class="btn" style="background:#f1f3f5; color:#fa5252; margin-top:20px;" onclick="logout()">Logout</button>
     </div>
 </div>
 
 <div id="chat-window">
-    <div class="header-container">
-        <div class="main-header" style="display:flex; align-items:center; text-align: left; padding: 15px;">
-            <button onclick="closeChat()" style="background:none; border:none; color:white; font-size:24px; margin-right: 15px;">←</button>
-            <span id="chat-with-name">Chat</span>
-        </div>
-    </div>
+    <div class="header-container"><div class="main-header" style="display:flex; align-items:center; text-align:left; padding:15px;"><button onclick="closeChat()" style="background:none; border:none; color:white; font-size:24px; margin-right:15px;">←</button><span id="chat-with-name">Chat</span></div></div>
     <div id="chat-messages"></div>
-    <div style="position:absolute; bottom:0; width:100%; padding:15px; background:white; display:flex; box-sizing:border-box;">
-        <input type="text" id="privateMsgInput" placeholder="Message..." style="margin:0; border-radius:25px;">
-        <button class="btn btn-blue" style="width:50px; border-radius:50%; margin-left:10px;" onclick="sendPrivateMessage()">➤</button>
-    </div>
+    <div style="position:absolute; bottom:0; width:100%; padding:15px; background:white; display:flex; box-sizing:border-box;"><input type="text" id="privateMsgInput" placeholder="Message..." style="margin:0; border-radius:25px;"><button class="btn btn-blue" style="width:50px; border-radius:50%; margin-left:10px;" onclick="sendPrivateMessage()">➤</button></div>
 </div>
 
 <div class="nav-bar">
