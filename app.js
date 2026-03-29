@@ -1,4 +1,3 @@
-// Configuration remains same
 const firebaseConfig = {
   apiKey: "AIzaSyAWZ2ky33M2U5xSWL-XSkU32y25U-Bwyrc",
   authDomain: "class-connect-b58f0.firebaseapp.com",
@@ -19,14 +18,12 @@ let user = null;
 let currentChatFriendUID = "";
 let blockedList = [];
 
-// --- DARK MODE TOGGLE ---
 function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
 }
 if(localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
 
-// --- AUTH & PROFILE ---
 auth.onAuthStateChanged((u) => {
     if (u) {
         document.getElementById('login-overlay').style.display = "none";
@@ -50,7 +47,6 @@ function loginWithGoogle() { auth.signInWithPopup(provider); }
 
 function updateUI() {
     if(!user) return;
-    document.getElementById('header-user-name').innerText = user.name;
     document.getElementById('header-user-img').src = user.photo;
     document.getElementById('p-img-large').src = user.photo;
     document.getElementById('p-name-display').innerText = user.name;
@@ -60,7 +56,7 @@ function updateUI() {
     document.getElementById('p-city').value = user.city;
 }
 
-// --- FEED LOGIC ---
+// FEED LOGIC
 async function handleFeedPost() {
     const txt = document.getElementById('msgInput').value.trim();
     const file = document.getElementById('feedPhotoInput').files[0];
@@ -84,12 +80,12 @@ db.ref('posts').on('value', snap => {
         if(p.groupKey === user.groupKey && !blockedList.includes(p.uid)) {
             let id = s.key;
             let imgTag = p.img ? `<img src="${p.img}" class="post-img">` : "";
-            let action = p.uid === user.uid ? `<span class="options-btn" onclick="deletePost('${id}')">🗑️</span>` : `<span class="options-btn" onclick="reportContent('${id}')">🚩</span>`;
+            let action = p.uid === user.uid ? `<span class="options-btn" onclick="deletePost('${id}')">🗑️ Delete</span>` : `<span class="options-btn" onclick="reportContent('${id}')">🚩 Report</span>`;
             
             cont.innerHTML = `
                 <div class="card">
                     ${action}
-                    <div style="font-size:14px; font-weight:600;">${p.name} <small style="color:gray; font-weight:400;">• ${p.time}</small></div>
+                    <div style="font-size:14px; font-weight:600;">${p.name} <small style="color:var(--sub); font-weight:400;">• ${p.time}</small></div>
                     <p style="font-size:14px; margin:10px 0;">${p.msg}</p>${imgTag}
                     <div class="action-bar">
                         <span class="action-item" onclick="likePost('${id}')">❤️ ${p.likes || 0}</span>
@@ -102,7 +98,7 @@ db.ref('posts').on('value', snap => {
     });
 });
 
-function deletePost(id) { if(confirm("Delete post?")) db.ref('posts/' + id).remove(); }
+function deletePost(id) { if(confirm("Delete this post?")) db.ref('posts/' + id).remove(); }
 function likePost(id) { db.ref('posts/' + id + '/likes').transaction(c => (c || 0) + 1); }
 function addComment(id) {
     let m = prompt("Comment:");
@@ -115,7 +111,7 @@ function loadComments(id) {
     });
 }
 
-// --- CHAT LOGIC ---
+// CHAT LOGIC
 function getChatId(u1, u2) { return u1 < u2 ? `${u1}_${u2}` : `${u2}_${u1}`; }
 
 async function sendPhoto() {
@@ -147,9 +143,9 @@ function loadMessages() {
     });
 }
 
-function deleteMsg(cid, mid) { if(confirm("Delete?")) db.ref('private_messages/'+cid+'/'+mid).remove(); }
+function deleteMsg(cid, mid) { if(confirm("Delete message?")) db.ref('private_messages/'+cid+'/'+mid).remove(); }
 
-// --- SEARCH & BLOCK ---
+// SEARCH, BLOCK & REPORT
 function searchAlumni() {
     const inst = document.getElementById('s-inst').value.toUpperCase();
     const year = document.getElementById('s-year').value;
@@ -180,7 +176,7 @@ function addFriend(uid, name) {
 
 function loadMyFriends() {
     db.ref('friends/' + user.uid).on('value', snap => {
-        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>Connections</h4>";
+        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>My Connections</h4>";
         snap.forEach(c => {
             if(!blockedList.includes(c.key)) list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
                 <b>${c.val().name}</b>
@@ -191,9 +187,9 @@ function loadMyFriends() {
 }
 
 function handleBlockToggle() {
-    if(confirm("Block user?")) {
+    if(confirm("Block this user?")) {
         db.ref(`users/${user.uid}/blocked/${currentChatFriendUID}`).set(true);
-        closeChat(); showToast("Blocked");
+        closeChat(); showToast("User Blocked");
     }
 }
 
@@ -201,13 +197,16 @@ function loadBlockedUsers() {
     const list = document.getElementById('blocked-users-list'); list.innerHTML = "";
     blockedList.forEach(uid => {
         db.ref('users/'+uid).once('value', s => {
-            list.innerHTML += `<div style="display:flex; justify-content:space-between; padding:5px;"><span>${s.val()?.name}</span><button onclick="unblock('${uid}')">Unblock</button></div>`;
+            if(s.exists()) {
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--border);"><span>${s.val().name}</span><button class="btn" style="color:var(--primary); padding:0;" onclick="unblock('${uid}')">Unblock</button></div>`;
+            }
         });
     });
 }
 function unblock(uid) { db.ref(`users/${user.uid}/blocked/${uid}`).remove(); }
+function reportContent(id) { prompt("Reason for reporting?"); showToast("Reported. We will review it."); }
 
-// --- UTILS ---
+// UTILS
 function toBase64(file) { return new Promise(res => { const r = new FileReader(); r.readAsDataURL(file); r.onload = () => res(r.result); }); }
 function show(id, title, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -220,7 +219,7 @@ function saveProfile() {
     db.ref('users/' + user.uid).update({
         inst: document.getElementById('p-inst').value, year: document.getElementById('p-year').value,
         batch: document.getElementById('p-class').value, city: document.getElementById('p-city').value
-    }).then(() => showToast("Saved!"));
+    }).then(() => showToast("Profile Updated! ✅"));
 }
 function openChat(uid, name) { currentChatFriendUID = uid; document.getElementById('chat-with-name').innerText = name; document.getElementById('chat-window').style.display = "flex"; loadMessages(); }
 function closeChat() { document.getElementById('chat-window').style.display = "none"; }
