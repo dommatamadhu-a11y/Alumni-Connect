@@ -1,3 +1,6 @@
+/**
+ * Alumni Connect Pro - All Features Integrated
+ */
 const firebaseConfig = {
   apiKey: "AIzaSyAWZ2ky33M2U5xSWL-XSkU32y25U-Bwyrc",
   authDomain: "class-connect-b58f0.firebaseapp.com",
@@ -17,12 +20,17 @@ const provider = new firebase.auth.GoogleAuthProvider();
 let user = null;
 let currentChatFriendUID = "";
 
+// --- AUTH LOGIC ---
 auth.onAuthStateChanged((u) => {
     if (u) {
         document.getElementById('login-overlay').style.display = "none";
         db.ref('users/' + u.uid).on('value', snap => {
             const d = snap.val();
-            user = { uid: u.uid, name: u.displayName, photo: u.photoURL, inst: d?.inst || "", year: d?.year || "", groupKey: d ? (d.inst + d.year).replace(/\s+/g,'').toUpperCase() : "" };
+            user = {
+                uid: u.uid, name: u.displayName, photo: u.photoURL,
+                inst: d?.inst || "", year: d?.year || "", city: d?.city || "", batch: d?.batch || "",
+                groupKey: d ? (d.inst + d.year).replace(/\s+/g,'').toUpperCase() : ""
+            };
             updateUI();
         });
     } else {
@@ -36,13 +44,16 @@ function updateUI() {
     if(!user) return;
     document.getElementById('header-user-name').innerText = user.name;
     document.getElementById('header-user-img').src = user.photo;
+    document.getElementById('header-group-tag').innerText = user.inst ? "🎓 " + user.inst : "Edit Profile";
     document.getElementById('p-img-large').src = user.photo;
     document.getElementById('p-name-display').innerText = user.name;
     document.getElementById('p-inst').value = user.inst;
     document.getElementById('p-year').value = user.year;
+    document.getElementById('p-class').value = user.batch;
+    document.getElementById('p-city').value = user.city;
 }
 
-// --- IMAGE HELPER ---
+// --- BASE64 HELPER ---
 function toBase64(file) {
     return new Promise((res) => {
         const reader = new FileReader();
@@ -55,13 +66,14 @@ function toBase64(file) {
 async function handleFeedPost() {
     const txt = document.getElementById('msgInput').value.trim();
     const file = document.getElementById('feedPhotoInput').files[0];
-    if(!user.inst) return alert("Update profile first!");
+    if(!user.inst) return alert("Please setup your profile first!");
     if(!txt && !file) return;
 
+    showToast("Posting...");
     let b64 = file ? await toBase64(file) : "";
     db.ref('posts').push({
         uid: user.uid, name: user.name, msg: txt, img: b64, groupKey: user.groupKey,
-        likes: 0, time: new Date().toLocaleTimeString()
+        likes: 0, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     });
     document.getElementById('msgInput').value = "";
     document.getElementById('feedPhotoInput').value = "";
@@ -73,48 +85,44 @@ db.ref('posts').on('value', snap => {
         const p = s.val();
         if(p.groupKey === user.groupKey) {
             let id = s.key;
-            let img = p.img ? `<img src="${p.img}" class="post-img">` : "";
-            let postHtml = `
+            let imgTag = p.img ? `<img src="${p.img}" class="post-img">` : "";
+            cont.innerHTML = `
                 <div class="card">
-                    <b>${p.name}</b> <small>${p.time}</small>
-                    <p>${p.msg}</p>${img}
+                    <b>${p.name}</b> <small style="color:gray;">${p.time}</small>
+                    <p>${p.msg}</p>${imgTag}
                     <div class="action-bar">
                         <span class="action-item" onclick="likePost('${id}')">❤️ ${p.likes || 0}</span>
                         <span class="action-item" onclick="addComment('${id}')">💬 Comment</span>
                     </div>
                     <div id="comments-${id}"></div>
-                </div>`;
-            cont.innerHTML = postHtml + cont.innerHTML;
+                </div>` + cont.innerHTML;
             loadComments(id);
         }
     });
 });
 
-function likePost(id) {
-    const ref = db.ref('posts/' + id + '/likes');
-    ref.transaction(c => (c || 0) + 1);
-}
+function likePost(id) { db.ref('posts/' + id + '/likes').transaction(c => (c || 0) + 1); }
 
 function addComment(id) {
-    let msg = prompt("Enter comment:");
+    let msg = prompt("Enter your comment:");
     if(msg) db.ref('comments/' + id).push({ name: user.name, msg: msg });
 }
 
 function loadComments(id) {
     db.ref('comments/' + id).limitToLast(3).on('value', snap => {
-        const cDiv = document.getElementById('comments-' + id);
-        cDiv.innerHTML = "";
+        const div = document.getElementById('comments-' + id); div.innerHTML = "";
         snap.forEach(s => {
             const c = s.val();
-            cDiv.innerHTML += `<div class="comment-box"><b>${c.name}:</b> ${c.msg}</div>`;
+            div.innerHTML += `<div class="comment-box"><b>${c.name}:</b> ${c.msg}</div>`;
         });
     });
 }
 
-// --- CHAT ---
+// --- CHAT LOGIC ---
 async function sendPhoto() {
     const file = document.getElementById('chatPhotoInput').files[0];
     if(file) {
+        showToast("Sending Photo...");
         const b64 = await toBase64(file);
         const chatId = user.uid < currentChatFriendUID ? `${user.uid}_${currentChatFriendUID}` : `${currentChatFriendUID}_${user.uid}`;
         db.ref('private_messages/' + chatId).push({ sender: user.uid, img: b64 });
@@ -142,7 +150,62 @@ function loadMessages() {
     });
 }
 
-// --- NAVIGATION & FRIENDS ---
+// --- SEARCH FRIENDS (4 Fields Filter) ---
+function searchAlumni() {
+    const inst = document.getElementById('s-inst').value.toUpperCase();
+    const year = document.getElementById('s-year').value;
+    const city = document.getElementById('s-city').value.toUpperCase();
+    const batch = document.getElementById('s-class').value.toUpperCase();
+    const res = document.getElementById('my-friends-list');
+    
+    res.innerHTML = "Searching...";
+    db.ref('users').once('value', snap => {
+        res.innerHTML = "<h4>Results</h4>";
+        let found = false;
+        snap.forEach(c => {
+            const u = c.val();
+            const match = (inst && u.inst?.toUpperCase().includes(inst)) || (year && u.year === year) || (city && u.city?.toUpperCase().includes(city)) || (batch && u.batch?.toUpperCase().includes(batch));
+            
+            if(c.key !== user.uid && match) {
+                found = true;
+                res.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div><b>${u.name}</b><br><small>${u.inst || ''} (${u.year || ''})</small></div>
+                    <button class="btn btn-blue" style="width:auto; padding:8px 15px;" onclick="addFriend('${c.key}', '${u.name}')">Connect</button>
+                </div>`;
+            }
+        });
+        if(!found) res.innerHTML = "<p>No matches found. Try broad search.</p>";
+    });
+}
+
+function addFriend(fUid, fName) {
+    db.ref('friends/' + user.uid + '/' + fUid).set({ name: fName });
+    db.ref('friends/' + fUid + '/' + user.uid).set({ name: user.name });
+    showToast("Connected! 🤝");
+}
+
+function loadMyFriends() {
+    db.ref('friends/' + user.uid).on('value', snap => {
+        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>My Connections</h4>";
+        snap.forEach(c => {
+            list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                <b>${c.val().name}</b>
+                <button class="btn btn-blue" style="width:auto; padding:8px 15px;" onclick="openChat('${c.key}', '${c.val().name}')">Chat</button>
+            </div>`;
+        });
+    });
+}
+
+// --- UTILS ---
+function saveProfile() {
+    db.ref('users/' + user.uid).update({
+        inst: document.getElementById('p-inst').value,
+        year: document.getElementById('p-year').value,
+        batch: document.getElementById('p-class').value,
+        city: document.getElementById('p-city').value
+    }).then(() => showToast("Profile Updated! ✅"));
+}
+
 function show(id, title, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
@@ -152,40 +215,10 @@ function show(id, title, el) {
     if(id === 'friends') loadMyFriends();
 }
 
-function searchAlumni() {
-    const inst = document.getElementById('s-inst').value.toUpperCase();
-    const res = document.getElementById('my-friends-list');
-    res.innerHTML = "Searching...";
-    db.ref('users').once('value', snap => {
-        res.innerHTML = "";
-        snap.forEach(c => {
-            const u = c.val();
-            if(c.key !== user.uid && u.inst?.toUpperCase().includes(inst)) {
-                res.innerHTML += `<div class="card" style="display:flex; justify-content:space-between;">
-                    <b>${u.name}</b>
-                    <button class="btn btn-blue" style="width:auto; padding:5px 15px;" onclick="addFriend('${c.key}', '${u.name}')">Connect</button>
-                </div>`;
-            }
-        });
-    });
-}
-
-function addFriend(fUid, fName) {
-    db.ref('friends/' + user.uid + '/' + fUid).set({ name: fName });
-    db.ref('friends/' + fUid + '/' + user.uid).set({ name: user.name });
-    alert("Connected!");
-}
-
-function loadMyFriends() {
-    db.ref('friends/' + user.uid).on('value', snap => {
-        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>My Friends</h4>";
-        snap.forEach(c => {
-            list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                <b>${c.val().name}</b>
-                <button class="btn btn-blue" style="width:auto; padding:5px 15px;" onclick="openChat('${c.key}', '${c.val().name}')">Chat</button>
-            </div>`;
-        });
-    });
+function showToast(msg) {
+    const x = document.getElementById("toast");
+    x.innerText = msg; x.className = "show";
+    setTimeout(() => x.className = "", 3000);
 }
 
 function openChat(uid, name) {
@@ -196,26 +229,6 @@ function openChat(uid, name) {
 }
 
 function closeChat() { document.getElementById('chat-window').style.display = "none"; }
-
-function clearChat() {
-    if(confirm("Clear chat?")) {
-        const chatId = user.uid < currentChatFriendUID ? `${user.uid}_${currentChatFriendUID}` : `${currentChatFriendUID}_${user.uid}`;
-        db.ref('private_messages/' + chatId).remove();
-    }
-}
-
-function saveProfile() {
-    db.ref('users/' + user.uid).update({
-        inst: document.getElementById('p-inst').value,
-        year: document.getElementById('p-year').value
-    }).then(() => alert("Saved!"));
-}
-
+function clearChat() { if(confirm("Clear this chat?")) db.ref('private_messages/' + (user.uid < currentChatFriendUID ? `${user.uid}_${currentChatFriendUID}` : `${currentChatFriendUID}_${user.uid}`)).remove(); }
 function logout() { auth.signOut().then(() => location.reload()); }
-
-function deleteAccount() {
-    if(confirm("Delete account permanently?")) {
-        db.ref('users/' + user.uid).remove();
-        auth.currentUser.delete().then(() => location.reload());
-    }
-}
+function deleteAccount() { if(confirm("Delete everything?")) { db.ref('users/' + user.uid).remove(); auth.currentUser.delete().then(() => location.reload()); } }
