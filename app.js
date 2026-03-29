@@ -1,5 +1,5 @@
 /**
- * Alumni Connect Pro - App Logic
+ * Alumni Connect Pro - Fully Integrated Logic
  */
 
 const firebaseConfig = {
@@ -21,7 +21,7 @@ const provider = new firebase.auth.GoogleAuthProvider();
 let user = null;
 let currentChatFriendUID = "";
 
-// Auth State Monitor
+// Auth State
 auth.onAuthStateChanged((u) => {
     const loginOverlay = document.getElementById('login-overlay');
     if (u) {
@@ -29,13 +29,8 @@ auth.onAuthStateChanged((u) => {
         db.ref('users/' + u.uid).on('value', snap => {
             const data = snap.val();
             user = {
-                uid: u.uid,
-                name: u.displayName,
-                email: u.email,
-                photo: u.photoURL,
-                inst: data?.inst || "",
-                year: data?.year || "",
-                city: data?.city || "",
+                uid: u.uid, name: u.displayName, email: u.email, photo: u.photoURL,
+                inst: data?.inst || "", year: data?.year || "", city: data?.city || "",
                 studyingClass: data?.studyingClass || "",
                 groupKey: data ? (data.inst + data.year).replace(/\s+/g,'').toUpperCase() : ""
             };
@@ -48,15 +43,14 @@ auth.onAuthStateChanged((u) => {
 });
 
 function loginWithGoogle() {
-    auth.signInWithPopup(provider).catch(err => alert("Login Error: " + err.message));
+    auth.signInWithPopup(provider).catch(err => alert("Error: " + err.message));
 }
 
 function updateUI() {
     if(!user) return;
     document.getElementById('header-user-name').innerText = user.name;
     document.getElementById('header-user-img').src = user.photo;
-    document.getElementById('header-group-tag').innerText = user.inst ? "🎓 " + user.inst : "Complete Profile";
-    
+    document.getElementById('header-group-tag').innerText = user.inst ? "🎓 " + user.inst : "Setup Profile";
     document.getElementById('p-img-large').src = user.photo;
     document.getElementById('p-name-display').innerText = user.name;
     document.getElementById('p-email-display').innerText = user.email;
@@ -64,12 +58,6 @@ function updateUI() {
     document.getElementById('p-year').value = user.year;
     document.getElementById('p-city').value = user.city;
     document.getElementById('p-class').value = user.studyingClass;
-}
-
-function showToast(msg) {
-    const x = document.getElementById("toast");
-    x.innerText = msg; x.className = "show";
-    setTimeout(() => x.className = "", 3000);
 }
 
 function show(id, title, el) {
@@ -81,34 +69,24 @@ function show(id, title, el) {
     if(id === 'friends') loadMyFriends();
 }
 
-// PROFILE LOGIC
-function saveProfile() {
-    const inst = document.getElementById('p-inst').value.trim();
-    const year = document.getElementById('p-year').value.trim();
-    const city = document.getElementById('p-city').value.trim();
-    const sc = document.getElementById('p-class').value.trim();
-
-    if(!inst || !year) return alert("Institution and Year are required to connect with batchmates!");
-
-    db.ref('users/' + user.uid).update({
-        inst, year, city, studyingClass: sc,
-        name: user.name, photo: user.photo
-    }).then(() => showToast("✅ Profile Updated Successfully!"));
+function showToast(msg) {
+    const x = document.getElementById("toast");
+    x.innerText = msg; x.className = "show";
+    setTimeout(() => x.className = "", 3000);
 }
 
-// FEED LOGIC
+// Feed Post
 function handleFeedPost() {
     const text = document.getElementById('msgInput').value.trim();
-    if(!user.inst) return alert("Update profile first to post to your batch!");
+    if(!user.inst) return alert("Update profile first!");
     if(!text) return;
-
     db.ref('posts').push({
         uid: user.uid, name: user.name, photo: user.photo,
         msg: text, groupKey: user.groupKey,
         time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
     }).then(() => {
         document.getElementById('msgInput').value = "";
-        showToast("Shared with batchmates! ❤️");
+        showToast("Posted to your batch! ❤️");
     });
 }
 
@@ -117,94 +95,89 @@ db.ref('posts').limitToLast(20).on('value', snap => {
     snap.forEach(c => {
         const p = c.val();
         if(user && p.groupKey === user.groupKey) {
-            cont.innerHTML = `
-                <div class="card">
-                    <div class="post-info">
-                        <img src="${p.photo}">
-                        <div><b>${p.name}</b><br><span class="post-meta">${p.time}</span></div>
-                    </div>
-                    <p style="margin:0; line-height:1.5;">${p.msg}</p>
-                </div>` + cont.innerHTML;
+            cont.innerHTML = `<div class="card"><b>${p.name}</b> <small>${p.time}</small><p>${p.msg}</p></div>` + cont.innerHTML;
         }
     });
 });
 
-// SEARCH & FRIENDS LOGIC
+// Search & Friends
 function searchAlumni() {
     const inst = document.getElementById('s-inst').value.toUpperCase();
     const year = document.getElementById('s-year').value;
     const city = document.getElementById('s-city').value.toUpperCase();
-    const sClass = document.getElementById('s-class').value.toUpperCase();
+    const sc = document.getElementById('s-class').value.toUpperCase();
     const res = document.getElementById('my-friends-list');
     res.innerHTML = "Searching...";
 
     db.ref('users').once('value', snap => {
-        res.innerHTML = "<h4>Search Results</h4>";
-        let found = false;
+        res.innerHTML = "<h4>Results</h4>";
         snap.forEach(c => {
             const u = c.val();
-            const uid = c.key;
-            
-            // Advanced Multi-filter Logic
-            const matchInst = inst && u.inst?.toUpperCase().includes(inst);
-            const matchYear = year && u.year === year;
-            const matchCity = city && u.city?.toUpperCase().includes(city);
-            const matchClass = sClass && u.studyingClass?.toUpperCase().includes(sClass);
-
-            if(uid !== user.uid && (matchInst || matchYear || matchCity || matchClass)) {
-                found = true;
-                res.innerHTML += `
-                    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <img src="${u.photo}" style="width:40px; height:40px; border-radius:50%;">
-                            <div>
-                                <b>${u.name}</b><br>
-                                <small style="color:gray;">${u.city || 'Unknown City'} | ${u.studyingClass || 'Class Unknown'}</small>
-                            </div>
-                        </div>
-                        <button class="btn btn-blue" style="width:auto; padding:6px 15px;" onclick="addFriend('${uid}', '${u.name}')">Connect</button>
-                    </div>`;
+            const match = (inst && u.inst?.toUpperCase().includes(inst)) || (year && u.year === year) || (city && u.city?.toUpperCase().includes(city)) || (sc && u.studyingClass?.toUpperCase().includes(sc));
+            if(c.key !== user.uid && match) {
+                res.innerHTML += `<div class="card" style="display:flex; justify-content:space-between;">
+                    <div><b>${u.name}</b><br><small>${u.city || ''}</small></div>
+                    <button class="btn btn-blue" style="width:auto; padding:5px 15px;" onclick="addFriend('${c.key}', '${u.name}')">Connect</button>
+                </div>`;
             }
         });
-        if(!found) res.innerHTML = "<p style='text-align:center; color:gray;'>No friends found matching these details.</p>";
     });
 }
 
 function addFriend(fUid, fName) {
     db.ref('friends/' + user.uid + '/' + fUid).set({ name: fName });
     db.ref('friends/' + fUid + '/' + user.uid).set({ name: user.name });
-    showToast("🤝 Connected with " + fName);
+    showToast("Connected! 🤝");
 }
 
 function loadMyFriends() {
     db.ref('friends/' + user.uid).on('value', snap => {
-        const l = document.getElementById('my-friends-list'); l.innerHTML = "<h4>My Connections</h4>";
-        snap.forEach(c => {
-            const fUid = c.key; const fData = c.val();
-            l.innerHTML += `
-                <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                    <div><b>👤 ${fData.name}</b> <span id="st-${fUid}" style="font-size:10px; margin-left:5px;"></span></div>
-                    <button class="btn btn-blue" style="width:auto; padding:6px 15px;" onclick="openChat('${fUid}', '${fData.name}')">Chat</button>
-                </div>`;
-            db.ref('status/' + fUid).on('value', s => {
-                const el = document.getElementById('st-'+fUid);
-                if(el) {
-                    const isOnline = s.val()?.state === 'online';
-                    el.innerText = isOnline ? "● Online" : "";
-                    el.style.color = isOnline ? "#2ec4b6" : "transparent";
+        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>Connections</h4>";
+        db.ref('blocks/' + user.uid).on('value', blockSnap => {
+            const blocked = blockSnap.val() ? Object.keys(blockSnap.val()) : [];
+            snap.forEach(c => {
+                if(!blocked.includes(c.key)) {
+                    list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                        <b>👤 ${c.val().name} <span id="st-${c.key}" style="font-size:10px;"></span></b>
+                        <button class="btn btn-blue" style="width:auto; padding:6px 15px;" onclick="openChat('${c.key}', '${c.val().name}')">Chat</button>
+                    </div>`;
                 }
             });
         });
     });
 }
 
-// CHAT & REAL-TIME STATUS
-function trackOnlineStatus() {
-    const sRef = db.ref('status/' + user.uid);
-    db.ref('.info/connected').on('value', snap => {
-        if(!snap.val()) return;
-        sRef.onDisconnect().set({ state: 'offline' }).then(() => sRef.set({ state: 'online' }));
-    });
+// Chat Functions
+function toggleBlockMenu() {
+    const m = document.getElementById('block-menu');
+    m.style.display = (m.style.display === 'block') ? 'none' : 'block';
+}
+
+function clearChat() {
+    if(confirm("Clear this chat history?")) {
+        const chatId = user.uid < currentChatFriendUID ? `${user.uid}_${currentChatFriendUID}` : `${currentChatFriendUID}_${user.uid}`;
+        db.ref('private_messages/' + chatId).remove();
+        showToast("Chat Cleared! 🗑");
+        toggleBlockMenu();
+    }
+}
+
+function blockUser() {
+    if(confirm("Block this user?")) {
+        db.ref('blocks/' + user.uid + '/' + currentChatFriendUID).set(true);
+        closeChat();
+        toggleBlockMenu();
+        showToast("Blocked 🚫");
+    }
+}
+
+function reportUser() {
+    let r = prompt("Reason?");
+    if(r) {
+        db.ref('reports').push({ reporter: user.uid, reported: currentChatFriendUID, reason: r });
+        showToast("Reported 🚩");
+        toggleBlockMenu();
+    }
 }
 
 function openChat(fUid, fName) {
@@ -231,6 +204,36 @@ function loadMessages() {
             c.innerHTML += `<div class="msg-bubble ${m.sender===user.uid?'mine':'theirs'}">${m.text}</div>`;
         });
         c.scrollTop = c.scrollHeight;
+    });
+}
+
+// Profile & Account
+function saveProfile() {
+    db.ref('users/' + user.uid).update({
+        inst: document.getElementById('p-inst').value,
+        year: document.getElementById('p-year').value,
+        city: document.getElementById('p-city').value,
+        studyingClass: document.getElementById('p-class').value,
+        name: user.name, photo: user.photo
+    }).then(() => showToast("Updated! ✅"));
+}
+
+function deleteAccount() {
+    if(confirm("DANGER: This will delete your profile and connections permanently. Continue?")) {
+        db.ref('users/' + user.uid).remove();
+        db.ref('friends/' + user.uid).remove();
+        db.ref('status/' + user.uid).remove();
+        auth.currentUser.delete().then(() => {
+            alert("Account Deleted.");
+            location.reload();
+        }).catch(() => alert("Please logout and login again to delete account."));
+    }
+}
+
+function trackOnlineStatus() {
+    const sRef = db.ref('status/' + user.uid);
+    db.ref('.info/connected').on('value', snap => {
+        if(snap.val()) sRef.onDisconnect().set({ state: 'offline' }).then(() => sRef.set({ state: 'online' }));
     });
 }
 
