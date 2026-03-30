@@ -15,8 +15,15 @@ const auth = firebase.auth();
 const provider = new firebase.auth.GoogleAuthProvider();
 
 let user = null;
-let currentChatFriendUID = "";
 let isChatOpen = false;
+let currentChatFriendUID = "";
+
+// --- SMART CLEANING FUNCTION ---
+// Removes dots, spaces, special chars and converts to Uppercase
+function cleanString(str) {
+    if (!str) return "";
+    return str.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
 
 // --- NOTIFICATIONS ---
 function enableNotifications() {
@@ -47,10 +54,12 @@ auth.onAuthStateChanged((u) => {
             const d = snap.val();
             user = {
                 uid: u.uid, name: u.displayName, photo: u.photoURL,
-                inst: d?.inst || "", year: d?.year || "", groupKey: d ? (d.inst + d.year).replace(/\s+/g,'').toUpperCase() : ""
+                inst: d?.inst || "", year: d?.year || "", 
+                // GroupKey now uses cleaned Institution Name + Year
+                groupKey: d ? cleanString(d.inst) + d.year : ""
             };
             updateUI(d);
-            listenForChatNotifications(); // Listen for messages
+            listenForChatNotifications();
         });
     } else {
         document.getElementById('login-overlay').style.display = "flex";
@@ -72,7 +81,7 @@ function updateUI(d) {
 // --- FEED & LIKE ANIMATION ---
 async function handleFeedPost() {
     const txt = document.getElementById('msgInput').value.trim();
-    if(!user.inst) return alert("Fill profile first!");
+    if(!user.inst) return alert("Please set your College Name in Profile!");
     if(!txt) return;
     db.ref('posts').push({
         uid: user.uid, name: user.name, msg: txt, groupKey: user.groupKey,
@@ -92,7 +101,7 @@ db.ref('posts').on('value', snap => {
                     <div style="font-size:13px; font-weight:600;">${p.name}</div>
                     <p style="font-size:14px; margin:8px 0;">${p.msg}</p>
                     <div style="font-size:18px; cursor:pointer;" onclick="likePost('${id}', this)">
-                        <span class="like-btn-anim">❤️</span> <small style="font-size:12px;">${p.likes || 0}</small>
+                        <span style="display:inline-block;">❤️</span> <small style="font-size:12px;">${p.likes || 0}</small>
                     </div>
                 </div>` + cont.innerHTML;
         }
@@ -101,20 +110,18 @@ db.ref('posts').on('value', snap => {
 
 function likePost(id, el) {
     db.ref('posts/'+id+'/likes').transaction(c => (c || 0) + 1);
-    const heart = el.querySelector('.like-btn-anim');
+    const heart = el.querySelector('span');
     heart.classList.add('active-heart');
     setTimeout(() => heart.classList.remove('active-heart'), 400);
 }
 
-// --- REAL-TIME CHAT & NOTIFICATIONS ---
+// --- CHAT NOTIFICATIONS ---
 function listenForChatNotifications() {
-    // Listen for any new messages sent to this user
     db.ref('friends/' + user.uid).once('value', snap => {
         snap.forEach(friend => {
             const chatId = user.uid < friend.key ? user.uid+'_'+friend.key : friend.key+'_'+user.uid;
             db.ref('private_messages/' + chatId).limitToLast(1).on('child_added', mSnap => {
                 const msg = mSnap.val();
-                // Notify if: Message is from friend AND chat is NOT open with them AND it's a recent message
                 if (msg.sender !== user.uid && (!isChatOpen || currentChatFriendUID !== msg.sender)) {
                     sendNotify("New Message", msg.text);
                 }
@@ -124,23 +131,19 @@ function listenForChatNotifications() {
 }
 
 function openChat(uid, name) {
-    currentChatFriendUID = uid;
-    isChatOpen = true;
+    currentChatFriendUID = uid; isChatOpen = true;
     document.getElementById('chat-with-name').innerText = name;
     document.getElementById('chat-window').style.display = "flex";
     loadMessages();
 }
 
-function closeChat() {
-    isChatOpen = false;
-    document.getElementById('chat-window').style.display = "none";
-}
+function closeChat() { isChatOpen = false; document.getElementById('chat-window').style.display = "none"; }
 
 function sendPrivateMessage() {
     const txt = document.getElementById('privateMsgInput').value.trim();
     if(!txt) return;
     const cid = user.uid < currentChatFriendUID ? user.uid+'_'+currentChatFriendUID : currentChatFriendUID+'_'+user.uid;
-    db.ref('private_messages/'+cid).push({ sender: user.uid, text: txt, timestamp: Date.now() });
+    db.ref('private_messages/'+cid).push({ sender: user.uid, text: txt });
     document.getElementById('privateMsgInput').value = "";
 }
 
@@ -156,14 +159,14 @@ function loadMessages() {
     });
 }
 
-// --- SEARCH & OTHERS ---
+// --- SEARCH & PROFILE ---
 function searchAlumni() {
-    const inst = document.getElementById('s-inst').value.toUpperCase();
+    const searchVal = cleanString(document.getElementById('s-inst').value);
     db.ref('users').once('value', snap => {
         const list = document.getElementById('my-friends-list'); list.innerHTML = "";
         snap.forEach(c => {
             const u = c.val();
-            if(c.key !== user.uid && u.inst?.toUpperCase().includes(inst)) {
+            if(c.key !== user.uid && cleanString(u.inst).includes(searchVal)) {
                 list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
                     <b>${u.name}</b>
                     <button class="btn btn-blue" style="width:auto; padding:5px 10px;" onclick="addFriend('${c.key}','${u.name}')">Connect</button>
@@ -181,7 +184,7 @@ function addFriend(uid, name) {
 
 function loadMyFriends() {
     db.ref('friends/'+user.uid).on('value', snap => {
-        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>Friends</h4>";
+        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>My Friends</h4>";
         snap.forEach(c => {
             list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between;">
                 <b>${c.val().name}</b>
