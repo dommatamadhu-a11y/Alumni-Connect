@@ -6,11 +6,9 @@
     <title>Alumni Connect</title>
     
     <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="Alumni Connect">
     <link rel="apple-touch-icon" href="logo.png">
-    <link rel="icon" type="image/png" href="logo.png">
 
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -21,26 +19,26 @@
         :root { 
             --primary: #6366f1; --accent: #f43f5e; --bg: #f8fafc; 
             --card: #ffffff; --text: #1e293b; --sub: #64748b; --border: #e2e8f0;
-            --nav-bg: rgba(255, 255, 255, 0.85);
+            --nav-bg: rgba(255, 255, 255, 0.9);
         }
         body.dark-mode {
             --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; 
-            --sub: #94a3b8; --border: #334155; --nav-bg: rgba(30, 41, 59, 0.85);
+            --sub: #94a3b8; --border: #334155; --nav-bg: rgba(30, 41, 59, 0.9);
         }
         body { 
             font-family: 'Poppins', sans-serif; background-color: var(--bg); 
             margin: 0; color: var(--text); padding-bottom: 90px; transition: 0.3s;
         }
 
-        /* Like Animation */
+        /* Heart Beat Animation */
         @keyframes heartBeat {
             0% { transform: scale(1); }
-            25% { transform: scale(1.4); }
-            50% { transform: scale(1); }
-            75% { transform: scale(1.2); }
+            15% { transform: scale(1.3); }
+            30% { transform: scale(1); }
+            45% { transform: scale(1.15); }
             100% { transform: scale(1); }
         }
-        .active-heart { animation: heartBeat 0.4s ease-out; color: #f43f5e !important; }
+        .active-heart { animation: heartBeat 0.5s ease-in-out; color: #f43f5e !important; }
 
         #noti-banner {
             background: var(--primary); color: white; padding: 10px; 
@@ -51,133 +49,150 @@
             position: fixed; inset: 0; background: var(--bg); z-index: 9999; 
             display: flex; align-items: center; justify-content: center; text-align: center; 
         }
-        .login-logo { width: 100px; height: 100px; margin-bottom: 15px; border-radius: 20px; }
+        .login-logo { width: 100px; height: 100px; margin-bottom: 15px; border-radius: 20px; box-shadow: 0 10px 20px rgba(99,102,241,0.2); }
 
         .header { 
             background: var(--nav-bg); backdrop-filter: blur(12px);
             position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid var(--border);
             padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;
         }
-        .header-left { display: flex; align-items: center; gap: 8px; }
-        .header-logo { width: 30px; height: 30px; }
-        .header-title { font-weight: 700; font-size: 16px; color: var(--primary); white-space: nowrap; }
+        .header-title { font-weight: 700; font-size: 18px; color: var(--primary); letter-spacing: -0.5px; }
 
         .section { padding: 15px; max-width: 500px; margin: auto; display: none; }
         .active { display: block; animation: fadeInUp 0.4s ease; }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .card { 
-            background: var(--card); border-radius: 18px; padding: 15px; 
+            background: var(--card); border-radius: 20px; padding: 15px; 
             margin-bottom: 15px; border: 1px solid var(--border); position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
         }
         input, textarea { 
-            width: 100%; border: 1px solid var(--border); border-radius: 10px; 
-            padding: 10px; font-family: inherit; margin: 5px 0;
-            background: var(--bg); color: var(--text); outline: none; box-sizing: border-box;
+            width: 100%; border: 1px solid var(--border); border-radius: 12px; 
+            padding: 12px; font-family: inherit; margin: 8px 0;
+            background: var(--bg); color: var(--text); outline: none; box-sizing: border-box; transition: 0.2s;
         }
-        .btn { border: none; padding: 10px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .btn { border: none; padding: 12px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn:active { transform: scale(0.98); }
         .btn-blue { background: var(--primary); color: white; width: 100%; }
 
+        .post-img { width: calc(100% + 30px); margin: 10px -15px; max-height: 400px; object-fit: cover; cursor: pointer; }
+        .chat-img { max-width: 100%; border-radius: 12px; margin-top: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        .action-btn { font-size: 11px; color: var(--sub); cursor: pointer; margin-left: 12px; transition: 0.2s; }
+        .action-btn:hover { color: var(--accent); }
+
         .nav-bar { 
-            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 400px; background: var(--nav-bg); backdrop-filter: blur(15px);
-            display: flex; justify-content: space-around; padding: 10px; 
-            border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); border: 1px solid var(--border);
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; background: var(--nav-bg); backdrop-filter: blur(20px);
+            display: flex; justify-content: space-around; padding: 12px; 
+            border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid var(--border);
         }
-        .nav-item { border: none; background: none; color: var(--sub); font-size: 18px; cursor: pointer; text-align: center; }
-        .active-nav { color: var(--primary); }
-        .nav-item span { display: block; font-size: 10px; }
+        .nav-item { border: none; background: none; color: var(--sub); font-size: 20px; cursor: pointer; transition: 0.3s; }
+        .active-nav { color: var(--primary); transform: translateY(-5px); }
+        .nav-item span { display: block; font-size: 10px; font-weight: 600; }
 
         #chat-window { display:none; position:fixed; inset:0; background:var(--bg); z-index:2000; flex-direction: column; }
-        #chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
-        .msg-bubble { padding: 10px 14px; border-radius: 15px; margin-bottom: 5px; font-size: 14px; max-width: 75%; }
-        .mine { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
-        .theirs { align-self: flex-start; background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+        #chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; scroll-behavior: smooth; }
+        .msg-bubble { padding: 10px 16px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; max-width: 80%; position: relative; line-height: 1.4; }
+        .mine { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+        .theirs { align-self: flex-start; background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+        .msg-time { font-size: 9px; opacity: 0.7; display: block; margin-top: 4px; text-align: right; }
 
-        #toast { visibility: hidden; background: #333; color: #fff; padding: 10px 20px; border-radius: 30px; position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); z-index: 10000; font-size: 13px; }
-        #toast.show { visibility: visible; }
+        #toast { visibility: hidden; background: rgba(0,0,0,0.8); color: #fff; padding: 12px 24px; border-radius: 50px; position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); z-index: 10000; font-size: 13px; backdrop-filter: blur(5px); }
+        #toast.show { visibility: visible; animation: fadeInUp 0.3s forwards; }
+
+        /* Empty State */
+        .empty-state { text-align: center; color: var(--sub); padding: 40px 20px; }
     </style>
 </head>
 <body>
 
 <div id="noti-banner">
-    Enable notifications to stay connected? 
-    <button onclick="enableNotifications()" style="margin-left:10px; border:none; padding:4px 8px; border-radius:5px; font-weight:bold;">Enable</button>
+    Stay updated with your batchmates! 
+    <button onclick="enableNotifications()" style="margin-left:10px; border:none; padding:5px 10px; border-radius:8px; font-weight:bold; cursor:pointer;">Enable Notifications</button>
 </div>
 
 <div id="login-overlay">
     <div>
         <img src="logo.png" alt="Logo" class="login-logo">
-        <div style="font-size: 24px; font-weight: 700; color: var(--primary);">Alumni Connect</div>
-        <p style="color:var(--sub); margin-bottom:20px;">The network of batchmates</p>
-        <button class="btn btn-blue" onclick="loginWithGoogle()">Sign in with Google</button>
+        <div style="font-size: 26px; font-weight: 700; color: var(--primary);">Alumni Connect</div>
+        <p style="color:var(--sub); margin-bottom:25px;">Reconnect with your roots.</p>
+        <button class="btn btn-blue" onclick="loginWithGoogle()" style="display:flex; align-items:center; justify-content:center; gap:10px; width:250px; margin:auto;">
+            Sign in with Google
+        </button>
     </div>
 </div>
 
 <div id="toast">Notification</div>
 
 <div class="header">
-    <div class="header-left">
-        <img src="logo.png" alt="Logo" class="header-logo">
-        <div class="header-title">Alumni Connect</div>
-    </div>
-    <div style="display:flex; align-items:center; gap:12px;">
-        <button onclick="toggleDarkMode()" style="background:none; border:none; font-size:18px;">🌓</button>
-        <img id="header-user-img" src="" style="width:32px; height:32px; border-radius:50%; border:2px solid var(--primary);" onclick="show('settings', '', document.querySelector('.nav-item:last-child'))">
+    <div class="header-title">Alumni Connect</div>
+    <div style="display:flex; align-items:center; gap:15px;">
+        <button onclick="toggleDarkMode()" style="background:none; border:none; font-size:20px; cursor:pointer;">🌓</button>
+        <img id="header-user-img" src="" style="width:34px; height:34px; border-radius:50%; border:2px solid var(--primary); cursor:pointer;" onclick="show('settings', '', document.querySelector('.nav-item:last-child'))">
     </div>
 </div>
 
 <div id="feed" class="section active">
     <div class="card">
-        <textarea id="msgInput" rows="2" placeholder="Post an update..."></textarea>
-        <button class="btn btn-blue" style="margin-top:5px;" onclick="handleFeedPost()">Post</button>
+        <textarea id="msgInput" rows="2" placeholder="What's happening in your batch?"></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+            <label style="cursor:pointer; font-size:22px;" title="Add Photo">🖼️ <input type="file" id="feedPhotoInput" hidden accept="image/*"></label>
+            <button class="btn btn-blue" style="width:80px; padding:8px;" onclick="handleFeedPost()">Post</button>
+        </div>
     </div>
     <div id="post-container"></div>
 </div>
 
 <div id="friends" class="section">
     <div class="card">
-        <h4 style="margin:0 0 10px 0;">Find Alumni</h4>
-        <input type="text" id="s-inst" placeholder="Enter College/School Name">
-        <button class="btn btn-blue" onclick="searchAlumni()">Search</button>
+        <h4 style="margin:0 0 12px 0;">Find Alumni</h4>
+        <input type="text" id="s-inst" placeholder="Enter College or School Name">
+        <button class="btn btn-blue" onclick="searchAlumni()">Search Batchmates</button>
     </div>
     <div id="my-friends-list"></div>
 </div>
 
 <div id="settings" class="section">
     <div class="card" style="text-align:center;">
-        <img id="p-img-large" style="width:70px; height:70px; border-radius:50%; border:2px solid var(--primary); object-fit: cover;">
-        <h3 id="p-name-display">User</h3>
+        <img id="p-img-large" style="width:80px; height:80px; border-radius:50%; border:3px solid var(--primary); object-fit: cover; margin-bottom:10px;">
+        <h3 id="p-name-display" style="margin:0;">User</h3>
+        <p style="font-size:12px; color:var(--sub); margin-bottom:20px;">Edit your details below</p>
+        
         <input type="text" id="p-inst" placeholder="Institution Name (e.g. JNTU)">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input type="text" id="p-year" placeholder="Passout Year">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <input type="number" id="p-year" placeholder="Passout Year">
             <input type="text" id="p-class" placeholder="Batch/Section">
         </div>
-        <input type="text" id="p-city" placeholder="City">
-        <button class="btn btn-blue" onclick="saveProfile()">Save Profile</button>
-        <button class="btn" style="margin-top:20px; color:var(--sub);" onclick="logout()">Logout</button>
+        <input type="text" id="p-city" placeholder="Current City">
+        <button class="btn btn-blue" onclick="saveProfile()" style="margin-top:10px;">Update Profile</button>
+        <button class="btn" style="margin-top:25px; color:var(--accent); background:none;" onclick="logout()">Sign Out</button>
     </div>
 </div>
 
 <div id="chat-window">
     <div class="header">
-        <div style="display:flex; align-items:center;">
-            <button onclick="closeChat()" style="background:none; border:none; font-size:22px; margin-right:10px;">←</button>
-            <span id="chat-with-name" style="font-weight:600;">Chat</span>
+        <div style="display:flex; align-items:center; width:100%;">
+            <button onclick="closeChat()" style="background:none; border:none; font-size:24px; margin-right:12px; cursor:pointer;">←</button>
+            <div id="chat-with-name" style="font-weight:600; font-size:16px;">Chat</div>
+            <button onclick="blockCurrentChatUser()" style="background:none; border:none; font-size:11px; color:var(--accent); margin-left:auto; font-weight:600; cursor:pointer;">BLOCK</button>
         </div>
     </div>
     <div id="chat-messages"></div>
-    <div style="padding:10px; background:var(--card); display:flex; gap:8px; border-top:1px solid var(--border);">
-        <input type="text" id="privateMsgInput" placeholder="Type a message..." style="margin:0;">
-        <button class="btn btn-blue" style="width:45px; border-radius:50%;" onclick="sendPrivateMessage()">➤</button>
+    <div style="padding:12px; background:var(--card); display:flex; gap:10px; border-top:1px solid var(--border); align-items:center;">
+        <label style="cursor:pointer; font-size:22px;">📷 <input type="file" id="chatPhotoInput" hidden accept="image/*" onchange="sendPhoto()"> </label>
+        <input type="text" id="privateMsgInput" placeholder="Type a message..." style="margin:0; flex:1;">
+        <button class="btn btn-blue" style="width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center;" onclick="sendPrivateMessage()">➤</button>
     </div>
 </div>
 
-<div class="nav-bar">
-    <button class="nav-item active-nav" onclick="show('feed', '', this)">🏠<span>Home</span></button>
-    <button class="nav-item" onclick="show('friends', '', this)">👥<span>Search</span></button>
+<nav class="nav-bar">
+    <button class="nav-item active-nav" onclick="show('feed', '', this)">🏠<span>Feed</span></button>
+    <button class="nav-item" onclick="show('friends', '', this)">👥<span>Network</span></button>
     <button class="nav-item" onclick="show('settings', '', this)">⚙️<span>Profile</span></button>
-</div>
+</nav>
 
 <script src="app.js"></script>
 </body>
