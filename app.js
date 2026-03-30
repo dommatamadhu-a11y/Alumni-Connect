@@ -17,12 +17,43 @@ const provider = new firebase.auth.GoogleAuthProvider();
 let user = null;
 let isChatOpen = false;
 let currentChatFriendUID = "";
+let blockedUsers = [];
 
-// --- SMART CLEANING FUNCTION ---
-// Removes dots, spaces, special chars and converts to Uppercase
-function cleanString(str) {
-    if (!str) return "";
-    return str.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+// --- UTILS & COMPRESSION ---
+function cleanString(str) { return str ? str.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : ""; }
+
+function formatTime(ts) {
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return new Date(ts).toLocaleDateString();
+}
+
+async function processImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800;
+                let width = img.width;
+                let height = img.height;
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress to 70% quality
+            };
+        };
+    });
 }
 
 // --- NOTIFICATIONS ---
@@ -30,11 +61,10 @@ function enableNotifications() {
     Notification.requestPermission().then(perm => {
         if (perm === "granted") {
             document.getElementById('noti-banner').style.display = 'none';
-            showToast("Notifications enabled!");
+            showToast("Notifications on!");
         }
     });
 }
-if (Notification.permission === "default") document.getElementById('noti-banner').style.display = 'block';
 
 function sendNotify(title, body) {
     if (Notification.permission === "granted") {
@@ -43,23 +73,27 @@ function sendNotify(title, body) {
 }
 
 // --- AUTH ---
-function loginWithGoogle() { 
-    auth.signInWithPopup(provider).catch(e => alert(e.message)); 
-}
-
 auth.onAuthStateChanged((u) => {
     if (u) {
         document.getElementById('login-overlay').style.display = "none";
+        
+        // Sync Block List
+        db.ref('blocks/' + u.uid).on('value', snap => {
+            blockedUsers = [];
+            snap.forEach(s => { blockedUsers.push(s.key); });
+            if(user) loadFeed(); 
+        });
+
         db.ref('users/' + u.uid).on('value', snap => {
             const d = snap.val();
             user = {
                 uid: u.uid, name: u.displayName, photo: u.photoURL,
                 inst: d?.inst || "", year: d?.year || "", 
-                // GroupKey now uses cleaned Institution Name + Year
                 groupKey: d ? cleanString(d.inst) + d.year : ""
             };
             updateUI(d);
             listenForChatNotifications();
+            loadFeed();
         });
     } else {
         document.getElementById('login-overlay').style.display = "flex";
@@ -78,58 +112,70 @@ function updateUI(d) {
     }
 }
 
-// --- FEED & LIKE ANIMATION ---
+// --- FEED LOGIC ---
 async function handleFeedPost() {
     const txt = document.getElementById('msgInput').value.trim();
-    if(!user.inst) return alert("Please set your College Name in Profile!");
-    if(!txt) return;
+    const file = document.getElementById('feedPhotoInput').files[0];
+    if(!user.inst || !user.year) return alert("Please finish your profile first!");
+    if(!txt && !file) return;
+
+    showToast("Posting...");
+    let imgData = file ? await processImage(file) : "";
+
     db.ref('posts').push({
-        uid: user.uid, name: user.name, msg: txt, groupKey: user.groupKey,
-        likes: 0, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+        uid: user.uid, name: user.name, msg: txt, img: imgData, 
+        groupKey: user.groupKey, likes: 0, time: Date.now()
     });
     document.getElementById('msgInput').value = "";
+    document.getElementById('feedPhotoInput').value = "";
 }
 
-db.ref('posts').on('value', snap => {
-    const cont = document.getElementById('post-container'); cont.innerHTML = "";
-    snap.forEach(s => {
-        const p = s.val();
-        if(p.groupKey === user.groupKey) {
-            let id = s.key;
-            cont.innerHTML = `
-                <div class="card">
-                    <div style="font-size:13px; font-weight:600;">${p.name}</div>
-                    <p style="font-size:14px; margin:8px 0;">${p.msg}</p>
-                    <div style="font-size:18px; cursor:pointer;" onclick="likePost('${id}', this)">
-                        <span style="display:inline-block;">❤️</span> <small style="font-size:12px;">${p.likes || 0}</small>
-                    </div>
-                </div>` + cont.innerHTML;
-        }
+function loadFeed() {
+    db.ref('posts').on('value', snap => {
+        const cont = document.getElementById('post-container');
+        cont.innerHTML = "";
+        let hasPosts = false;
+        
+        const posts = [];
+        snap.forEach(s => { posts.push({id: s.key, ...s.val()}); });
+        posts.reverse().forEach(p => {
+            if(p.groupKey === user.groupKey && !blockedUsers.includes(p.uid)) {
+                hasPosts = true;
+                let imgTag = p.img ? `<img src="${p.img}" class="post-img" onclick="window.open('${p.img}')">` : "";
+                let deleteBtn = p.uid === user.uid ? `<span class="action-btn" onclick="deletePost('${p.id}')">Delete</span>` : "";
+                
+                cont.innerHTML += `
+                    <div class="card">
+                        <span class="action-btn" onclick="reportPost('${p.id}', '${p.msg}')">Report</span>
+                        ${deleteBtn}
+                        <div style="font-size:13px; font-weight:600;">${p.name} <small style="font-weight:400; opacity:0.6; margin-left:5px;">${formatTime(p.time)}</small></div>
+                        <p style="font-size:14px; margin:10px 0;">${p.msg}</p>
+                        ${imgTag}
+                        <div style="font-size:20px; cursor:pointer; display:inline-block;" onclick="likePost('${p.id}', this)">
+                            <span style="display:inline-block;">❤️</span> <small style="font-size:13px;">${p.likes || 0}</small>
+                        </div>
+                    </div>`;
+            }
+        });
+        if(!hasPosts) cont.innerHTML = `<div class="empty-state">No posts in your batch yet. Be the first!</div>`;
     });
-});
+}
 
+function deletePost(id) { if(confirm("Delete this post?")) db.ref('posts/'+id).remove(); }
 function likePost(id, el) {
     db.ref('posts/'+id+'/likes').transaction(c => (c || 0) + 1);
-    const heart = el.querySelector('span');
-    heart.classList.add('active-heart');
-    setTimeout(() => heart.classList.remove('active-heart'), 400);
+    const h = el.querySelector('span');
+    h.classList.add('active-heart');
+    setTimeout(() => h.classList.remove('active-heart'), 500);
+}
+function reportPost(id, msg) {
+    if(confirm("Report this post?")) {
+        db.ref('reports').push({ reporter: user.uid, postId: id, msg: msg, time: Date.now() });
+        showToast("Post reported.");
+    }
 }
 
-// --- CHAT NOTIFICATIONS ---
-function listenForChatNotifications() {
-    db.ref('friends/' + user.uid).once('value', snap => {
-        snap.forEach(friend => {
-            const chatId = user.uid < friend.key ? user.uid+'_'+friend.key : friend.key+'_'+user.uid;
-            db.ref('private_messages/' + chatId).limitToLast(1).on('child_added', mSnap => {
-                const msg = mSnap.val();
-                if (msg.sender !== user.uid && (!isChatOpen || currentChatFriendUID !== msg.sender)) {
-                    sendNotify("New Message", msg.text);
-                }
-            });
-        });
-    });
-}
-
+// --- CHAT LOGIC ---
 function openChat(uid, name) {
     currentChatFriendUID = uid; isChatOpen = true;
     document.getElementById('chat-with-name').innerText = name;
@@ -143,8 +189,19 @@ function sendPrivateMessage() {
     const txt = document.getElementById('privateMsgInput').value.trim();
     if(!txt) return;
     const cid = user.uid < currentChatFriendUID ? user.uid+'_'+currentChatFriendUID : currentChatFriendUID+'_'+user.uid;
-    db.ref('private_messages/'+cid).push({ sender: user.uid, text: txt });
+    db.ref('private_messages/'+cid).push({ sender: user.uid, text: txt, time: Date.now() });
     document.getElementById('privateMsgInput').value = "";
+}
+
+async function sendPhoto() {
+    const file = document.getElementById('chatPhotoInput').files[0];
+    if(file) {
+        showToast("Sending photo...");
+        const b = await processImage(file);
+        const cid = user.uid < currentChatFriendUID ? user.uid+'_'+currentChatFriendUID : currentChatFriendUID+'_'+user.uid;
+        db.ref('private_messages/'+cid).push({ sender: user.uid, img: b, time: Date.now() });
+        document.getElementById('chatPhotoInput').value = "";
+    }
 }
 
 function loadMessages() {
@@ -153,23 +210,53 @@ function loadMessages() {
         const c = document.getElementById('chat-messages'); c.innerHTML = "";
         snap.forEach(s => {
             const m = s.val();
-            c.innerHTML += `<div class="msg-bubble ${m.sender===user.uid?'mine':'theirs'}">${m.text}</div>`;
+            const isMine = m.sender === user.uid;
+            let content = m.text ? m.text : `<img src="${m.img}" class="chat-img" onclick="window.open('${m.img}')">`;
+            c.innerHTML += `
+                <div class="msg-bubble ${isMine?'mine':'theirs'}" onclick="${isMine ? `deleteChatMsg('${cid}','${s.key}')`:''}">
+                    ${content}
+                    <span class="msg-time">${new Date(m.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                </div>`;
         });
         c.scrollTop = c.scrollHeight;
     });
 }
 
-// --- SEARCH & PROFILE ---
+function deleteChatMsg(cid, mid) { if(confirm("Delete message for everyone?")) db.ref('private_messages/'+cid+'/'+mid).remove(); }
+function blockCurrentChatUser() {
+    if(confirm("Block this user?")) {
+        db.ref('blocks/' + user.uid + '/' + currentChatFriendUID).set(true);
+        showToast("User blocked.");
+        closeChat();
+    }
+}
+
+function listenForChatNotifications() {
+    db.ref('friends/' + user.uid).once('value', snap => {
+        snap.forEach(f => {
+            const cid = user.uid < f.key ? user.uid+'_'+f.key : f.key+'_'+user.uid;
+            db.ref('private_messages/'+cid).limitToLast(1).on('child_added', mSnap => {
+                const m = mSnap.val();
+                if(m.sender !== user.uid && !blockedUsers.includes(m.sender) && (!isChatOpen || currentChatFriendUID !== m.sender)) {
+                    sendNotify("New message from " + f.val().name, m.text || "Sent a photo");
+                }
+            });
+        });
+    });
+}
+
+// --- NETWORK & PROFILE ---
 function searchAlumni() {
-    const searchVal = cleanString(document.getElementById('s-inst').value);
+    const s = cleanString(document.getElementById('s-inst').value);
+    if(!s) return showToast("Enter a name");
     db.ref('users').once('value', snap => {
-        const list = document.getElementById('my-friends-list'); list.innerHTML = "";
+        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>Search Results</h4>";
         snap.forEach(c => {
             const u = c.val();
-            if(c.key !== user.uid && cleanString(u.inst).includes(searchVal)) {
+            if(c.key !== user.uid && cleanString(u.inst).includes(s)) {
                 list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                    <b>${u.name}</b>
-                    <button class="btn btn-blue" style="width:auto; padding:5px 10px;" onclick="addFriend('${c.key}','${u.name}')">Connect</button>
+                    <div><b>${u.name}</b><br><small>${u.inst} (${u.year})</small></div>
+                    <button class="btn btn-blue" style="width:auto; padding:8px 15px;" onclick="addFriend('${c.key}','${u.name}')">Connect</button>
                 </div>`;
             }
         });
@@ -179,28 +266,32 @@ function searchAlumni() {
 function addFriend(uid, name) {
     db.ref('friends/'+user.uid+'/'+uid).set({name: name});
     db.ref('friends/'+uid+'/'+user.uid).set({name: user.name});
-    showToast("Connected!");
+    showToast("Added to network!");
 }
 
 function loadMyFriends() {
     db.ref('friends/'+user.uid).on('value', snap => {
-        const list = document.getElementById('my-friends-list'); list.innerHTML = "<h4>My Friends</h4>";
+        const list = document.getElementById('my-friends-list'); 
+        list.innerHTML = "<h4>My Network</h4>";
+        if(!snap.exists()) list.innerHTML += `<p style="font-size:12px; color:var(--sub);">Search and connect with friends.</p>`;
         snap.forEach(c => {
-            list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between;">
+            list.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
                 <b>${c.val().name}</b>
-                <button class="btn btn-blue" style="width:auto; padding:5px 10px;" onclick="openChat('${c.key}','${c.val().name}')">Chat</button>
+                <button class="btn btn-blue" style="width:auto; padding:8px 15px;" onclick="openChat('${c.key}','${c.val().name}')">Chat</button>
             </div>`;
         });
     });
 }
 
 function saveProfile() {
+    const inst = document.getElementById('p-inst').value;
+    const year = document.getElementById('p-year').value;
+    if(!inst || !year) return alert("Institution and Year are required!");
     db.ref('users/'+user.uid).update({
-        inst: document.getElementById('p-inst').value,
-        year: document.getElementById('p-year').value,
+        inst: inst, year: year,
         batch: document.getElementById('p-class').value,
         city: document.getElementById('p-city').value
-    }).then(() => showToast("Profile Saved!"));
+    }).then(() => showToast("Profile Updated!"));
 }
 
 function show(id, t, el) {
@@ -210,5 +301,8 @@ function show(id, t, el) {
     el.classList.add('active-nav');
     if(id === 'friends') loadMyFriends();
 }
-function logout() { auth.signOut().then(() => location.reload()); }
+
+function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
+function loginWithGoogle() { auth.signInWithPopup(provider).catch(e => alert("Login failed. Try again.")); }
+function logout() { if(confirm("Sign out?")) auth.signOut().then(() => location.reload()); }
 function showToast(m) { const t = document.getElementById("toast"); t.innerText = m; t.className = "show"; setTimeout(() => t.className = "", 3000); }
