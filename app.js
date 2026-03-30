@@ -24,7 +24,7 @@ function toggleDarkMode() {
 }
 if(localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark-mode');
 
-// --- ORIGINAL LOGIN WITH POPUP ---
+// --- LOGIN WITH POPUP (BEST FOR BROWSER) ---
 function loginWithGoogle() { 
     auth.signInWithPopup(provider).catch(err => alert("Login Error: " + err.message)); 
 }
@@ -66,7 +66,7 @@ async function handleFeedPost() {
     if(!user.inst) return alert("Please update your profile information first.");
     if(!txt && !file) return;
 
-    showToast("Sharing post...");
+    showToast("Posting...");
     let b64 = file ? await toBase64(file) : "";
     db.ref('posts').push({
         uid: user.uid, name: user.name, msg: txt, img: b64, groupKey: user.groupKey,
@@ -104,7 +104,7 @@ db.ref('posts').on('value', snap => {
 function deletePost(id) { if(confirm("Delete this post?")) db.ref('posts/' + id).remove(); }
 function likePost(id) { db.ref('posts/' + id + '/likes').transaction(c => (c || 0) + 1); }
 function addComment(id) {
-    let m = prompt("Write your comment:");
+    let m = prompt("Enter your comment:");
     if(m) db.ref('comments/' + id).push({ name: user.name, msg: m, uid: user.uid });
 }
 function loadComments(id) {
@@ -148,7 +148,7 @@ function loadMessages() {
 
 function deleteMsg(cid, mid) { if(confirm("Delete this message?")) db.ref('private_messages/'+cid+'/'+mid).remove(); }
 
-// SOCIAL & SEARCH
+// SOCIAL FEATURES
 function searchAlumni() {
     const inst = document.getElementById('s-inst').value.toUpperCase();
     const year = document.getElementById('s-year').value;
@@ -171,7 +171,7 @@ function searchAlumni() {
 function addFriend(uid, name) {
     db.ref('friends/'+user.uid+'/'+uid).set({name: name});
     db.ref('friends/'+uid+'/'+user.uid).set({name: user.name});
-    showToast("Connection successful!");
+    showToast("Connected Successfully!");
 }
 
 function loadMyFriends() {
@@ -184,7 +184,7 @@ function loadMyFriends() {
 }
 
 function handleBlockToggle() {
-    if(confirm("Block this user? They won't be able to see you.")) {
+    if(confirm("Block this user? They will not be able to interact with you.")) {
         db.ref(`users/${user.uid}/blocked/${currentChatFriendUID}`).set(true);
         closeChat(); showToast("User Blocked");
     }
@@ -199,9 +199,9 @@ function loadBlockedUsers() {
     });
 }
 function unblock(uid) { db.ref(`users/${user.uid}/blocked/${uid}`).remove(); }
-function reportContent(id) { prompt("Reason for reporting?"); showToast("Reported to admin."); }
+function reportContent(id) { prompt("Reason for reporting?"); showToast("Reported."); }
 
-// UTILS
+// HELPERS
 function toBase64(file) { return new Promise(res => { const r = new FileReader(); r.readAsDataURL(file); r.onload = () => res(r.result); }); }
 function show(id, title, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -220,4 +220,4 @@ function openChat(uid, name) { currentChatFriendUID = uid; document.getElementBy
 function closeChat() { document.getElementById('chat-window').style.display = "none"; }
 function showToast(m) { const t = document.getElementById("toast"); t.innerText = m; t.className = "show"; setTimeout(() => t.className = "", 3000); }
 function logout() { auth.signOut().then(() => location.reload()); }
-function deleteAccount() { if(confirm("Are you sure? This cannot be undone.")) { db.ref('users/'+user.uid).remove(); auth.currentUser.delete().then(()=>location.reload()); } }
+function deleteAccount() { if(confirm("Are you sure? This action is permanent.")) { db.ref('users/'+user.uid).remove(); auth.currentUser.delete().then(()=>location.reload()); } }
