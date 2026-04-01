@@ -3,209 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alumni Connect</title>
-    
+    <title>Global Alumni Connect</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#6366f1">
-    <meta name="mobile-web-app-capable" content="yes">
-    <link rel="apple-touch-icon" href="logo.png">
-
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { 
-            --primary: #6366f1; --accent: #f43f5e; --bg: #f8fafc; 
-            --card: #ffffff; --text: #1e293b; --sub: #64748b; --border: #e2e8f0;
-            --nav-bg: rgba(255, 255, 255, 0.9);
-        }
-        body.dark-mode {
-            --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; 
-            --sub: #94a3b8; --border: #334155; --nav-bg: rgba(30, 41, 59, 0.9);
-        }
-        body { 
-            font-family: 'Poppins', sans-serif; background-color: var(--bg); 
-            margin: 0; color: var(--text); padding-bottom: 90px; transition: 0.3s;
-        }
-
-        @keyframes heartBeat {
-            0% { transform: scale(1); }
-            15% { transform: scale(1.3); }
-            30% { transform: scale(1); }
-            45% { transform: scale(1.15); }
-            100% { transform: scale(1); }
-        }
-        .active-heart { animation: heartBeat 0.5s ease-in-out; color: #f43f5e !important; }
-
-        #login-overlay { 
-            position: fixed; inset: 0; background: var(--bg); z-index: 9999; 
-            display: flex; align-items: center; justify-content: center; text-align: center; 
-        }
-        .login-logo { width: 100px; height: 100px; margin-bottom: 15px; border-radius: 20px; box-shadow: 0 10px 20px rgba(99,102,241,0.2); }
-
-        .header { 
-            background: var(--nav-bg); backdrop-filter: blur(12px);
-            position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid var(--border);
-            padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;
-        }
-        .header-title { font-weight: 700; font-size: 18px; color: var(--primary); letter-spacing: -0.5px; }
-
-        .section { padding: 15px; max-width: 500px; margin: auto; display: none; }
-        .active { display: block; animation: fadeInUp 0.4s ease; }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .card { 
-            background: var(--card); border-radius: 20px; padding: 15px; 
-            margin-bottom: 15px; border: 1px solid var(--border); position: relative;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-        }
-        input, textarea { 
-            width: 100%; border: 1px solid var(--border); border-radius: 12px; 
-            padding: 12px; font-family: inherit; margin: 8px 0;
-            background: var(--bg); color: var(--text); outline: none; box-sizing: border-box; transition: 0.2s;
-        }
-        .btn { border: none; padding: 12px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn:active { transform: scale(0.98); }
-        .btn-blue { background: var(--primary); color: white; width: 100%; }
-        .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); width: 100%; margin-top: 10px; }
-
-        /* Poll Styles */
-        .poll-option { 
-            background: var(--bg); border: 1px solid var(--border); 
-            padding: 10px; margin: 5px 0; border-radius: 10px; 
-            cursor: pointer; position: relative; overflow: hidden;
-        }
-        .poll-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(99,102,241,0.1); transition: 0.5s; z-index: 0; }
-        .poll-text { position: relative; z-index: 1; display: flex; justify-content: space-between; font-size: 13px; }
-
-        .post-img { width: calc(100% + 30px); margin: 10px -15px; max-height: 400px; object-fit: cover; cursor: pointer; }
-        .chat-img { max-width: 100%; border-radius: 12px; margin-top: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        :root { --primary: #6366f1; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --sub: #64748b; }
+        .dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --sub: #94a3b8; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; transition: 0.3s; padding-bottom: 70px; }
         
-        .action-btn { font-size: 11px; color: var(--sub); cursor: pointer; margin-left: 12px; transition: 0.2s; }
+        /* Navigation */
+        .header { background: var(--primary); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .nav-bottom { position: fixed; bottom: 0; width: 100%; background: var(--card); display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #ddd; }
+        .nav-item { color: var(--sub); font-size: 20px; cursor: pointer; text-align: center; }
+        .active-nav { color: var(--primary); }
 
-        .nav-bar { 
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 400px; background: var(--nav-bg); backdrop-filter: blur(20px);
-            display: flex; justify-content: space-around; padding: 12px; 
-            border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid var(--border);
-        }
-        .nav-item { border: none; background: none; color: var(--sub); font-size: 20px; cursor: pointer; }
-        .active-nav { color: var(--primary); transform: translateY(-3px); }
-        .nav-item span { display: block; font-size: 10px; font-weight: 600; }
+        /* Content */
+        .container { padding: 15px; max-width: 600px; margin: auto; }
+        .section { display: none; }
+        .active { display: block; }
+        .card { background: var(--card); border-radius: 15px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        
+        /* Profile UI */
+        .profile-header { text-align: center; margin-bottom: 20px; }
+        .p-img-container { position: relative; display: inline-block; }
+        #p-img-large { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; }
+        .upload-btn { position: absolute; bottom: 0; right: 0; background: var(--primary); color: white; padding: 5px; border-radius: 50%; cursor: pointer; font-size: 12px; }
 
-        #chat-window { display:none; position:fixed; inset:0; background:var(--bg); z-index:2000; flex-direction: column; }
-        #chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
-        .msg-bubble { padding: 10px 16px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; max-width: 80%; }
-        .mine { align-self: flex-end; background: var(--primary); color: white; }
-        .theirs { align-self: flex-start; background: var(--card); border: 1px solid var(--border); }
-
-        #toast { visibility: hidden; background: rgba(0,0,0,0.8); color: #fff; padding: 12px 24px; border-radius: 50px; position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); z-index: 10000; font-size: 13px; }
-        #toast.show { visibility: visible; animation: fadeInUp 0.3s forwards; }
+        /* Chat & Feed UI */
+        .post-img, .chat-img { width: 100%; border-radius: 10px; margin-top: 10px; }
+        .msg-bubble { padding: 10px; border-radius: 15px; margin: 5px 0; max-width: 80%; }
+        .mine { background: var(--primary); color: white; align-self: flex-end; margin-left: auto; }
+        .theirs { background: #e2e8f0; color: #333; }
+        
+        /* Auth Overlay */
+        #login-overlay { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .btn { padding: 12px 25px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+        .btn-blue { background: var(--primary); color: white; }
+        
+        #toast { visibility: hidden; min-width: 200px; background: #333; color: #fff; text-align: center; padding: 10px; position: fixed; z-index: 1000; bottom: 80px; left: 50%; transform: translateX(-50%); border-radius: 5px; }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 80px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 80px; opacity: 1;} to {bottom: 0; opacity: 0;} }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
-    <div>
-        <img src="logo.png" alt="Logo" class="login-logo">
-        <div style="font-size: 24px; font-weight: 700; color: var(--primary);">Alumni Connect</div>
-        <p style="color:var(--sub); margin-bottom:20px;">Connect with your batchmates</p>
-        <button class="btn btn-blue" onclick="loginWithGoogle()" style="width:250px;">Sign in with Google</button>
-    </div>
+    <img src="logo.png" width="120" style="margin-bottom: 20px;">
+    <h2>Global Alumni Connect</h2>
+    <p>Connecting Graduates Worldwide</p>
+    <button class="btn btn-blue" onclick="loginWithGoogle()"><i class="fab fa-google"></i> Login with Google</button>
 </div>
-
-<div id="toast">Notification</div>
 
 <div class="header">
-    <div class="header-title">Alumni Connect</div>
-    <div style="display:flex; align-items:center; gap:12px;">
-        <button onclick="toggleDarkMode()" style="background:none; border:none; font-size:18px;">🌓</button>
-        <img id="header-user-img" src="" style="width:32px; height:32px; border-radius:50%; border:2px solid var(--primary);" onclick="show('settings', '', document.querySelector('.nav-item:last-child'))">
-    </div>
+    <span onclick="toggleDarkMode()"><i class="fas fa-moon"></i> Connect</span>
+    <img id="header-user-img" src="" width="35" style="border-radius:50%; background:#eee;">
 </div>
 
-<div id="feed" class="section active">
-    <div class="card">
-        <div style="display:flex; gap:15px; margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:5px;">
-            <small onclick="togglePostType('msg')" id="tab-msg" style="cursor:pointer; color:var(--primary); font-weight:600;">📝 Post</small>
-            <small onclick="togglePostType('poll')" id="tab-poll" style="cursor:pointer; color:var(--sub);">📊 Poll</small>
-        </div>
-        
-        <div id="msg-area">
-            <textarea id="msgInput" rows="2" placeholder="What's happening?"></textarea>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <label style="cursor:pointer; font-size:20px;">🖼️ <input type="file" id="feedPhotoInput" hidden accept="image/*"></label>
-                <button class="btn btn-blue" style="width:80px; padding:6px;" onclick="handleFeedPost()">Post</button>
+<div class="container">
+    <div id="feed" class="section active">
+        <div class="card">
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button id="tab-msg" onclick="togglePostType('msg')" style="background:none; border:none; font-weight:bold; color:var(--primary);">Post</button>
+                <button id="tab-poll" onclick="togglePostType('poll')" style="background:none; border:none; font-weight:bold; color:var(--sub);">Poll</button>
+            </div>
+            <div id="msg-area">
+                <textarea id="msgInput" placeholder="Share something with your alumni..." style="width:100%; border:1px solid #ddd; border-radius:10px; padding:10px;"></textarea>
+                <input type="file" id="feedPhotoInput" accept="image/*" style="margin-top:10px;">
+                <button class="btn btn-blue" onclick="handleFeedPost()">Post Now</button>
+            </div>
+            <div id="poll-area" style="display:none;">
+                <input type="text" id="pollQ" placeholder="Poll Question" style="width:93%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:5px;">
+                <input type="text" id="opt1" placeholder="Option 1" style="width:93%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:5px;">
+                <input type="text" id="opt2" placeholder="Option 2" style="width:93%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                <button class="btn btn-blue" onclick="handlePollPost()">Create Poll</button>
             </div>
         </div>
-
-        <div id="poll-area" style="display:none;">
-            <input type="text" id="pollQ" placeholder="Ask a question...">
-            <input type="text" id="opt1" placeholder="Option 1">
-            <input type="text" id="opt2" placeholder="Option 2">
-            <button class="btn btn-blue" style="margin-top:5px;" onclick="handlePollPost()">Create Poll</button>
-        </div>
+        <div id="post-container"></div>
     </div>
-    <div id="post-container"></div>
-</div>
 
-<div id="friends" class="section">
-    <div class="card">
-        <h4 style="margin:0 0 10px 0;">Find Alumni</h4>
-        <input type="text" id="s-inst" placeholder="Institution Name">
-        <input type="text" id="s-inst-city" placeholder="Institution City">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input type="number" id="s-year" placeholder="Passout Year">
-            <input type="text" id="s-group" placeholder="Class/Group/Section">
+    <div id="network" class="section">
+        <div class="card">
+            <h4>Find Alumni</h4>
+            <input type="text" id="s-inst" placeholder="Institution Name" style="width:93%; padding:10px; margin-bottom:5px; border:1px solid #ddd; border-radius:8px;">
+            <input type="number" id="s-year" placeholder="Graduation Year" style="width:93%; padding:10px; margin-bottom:5px; border:1px solid #ddd; border-radius:8px;">
+            <button class="btn btn-blue" onclick="searchAlumni()">Search</button>
         </div>
-        <button class="btn btn-blue" onclick="searchAlumni()">Search</button>
+        <div id="my-friends-list"></div>
     </div>
-    <div id="my-friends-list"></div>
-</div>
 
-<div id="settings" class="section">
-    <div class="card" style="text-align:center;">
-        <img id="p-img-large" style="width:70px; height:70px; border-radius:50%; border:2px solid var(--primary);">
-        <h3 id="p-name-display" style="margin:5px 0;">User</h3>
-        
-        <input type="text" id="p-inst" placeholder="Institution Name">
-        <input type="text" id="p-inst-city" placeholder="Institution City">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input type="number" id="p-year" placeholder="Passout Year">
-            <input type="text" id="p-group" placeholder="Class/Group/Section">
+    <div id="profile" class="section">
+        <div class="card profile-header">
+            <div class="p-img-container">
+                <img id="p-img-large" src="https://via.placeholder.com/100">
+                <label for="profilePhotoInput" class="upload-btn"><i class="fas fa-camera"></i></label>
+                <input type="file" id="profilePhotoInput" accept="image/*" style="display:none;" onchange="uploadProfilePhoto()">
+            </div>
+            <h3 id="p-name-display">Loading...</h3>
+            <p id="p-email-display" style="font-size:12px; color:var(--sub);"></p>
         </div>
-        <button class="btn btn-blue" onclick="saveProfile()">Update Profile</button>
-        
-        <hr style="margin:20px 0; border:0; border-top:1px solid var(--border);">
-        
-        <button class="btn btn-outline" onclick="inviteFriend()">📲 Invite Your Friends</button>
-        
-        <button class="btn" style="margin-top:20px; color:var(--accent); background:none;" onclick="logout()">Sign Out</button>
+        <div class="card">
+            <h4>Education Details</h4>
+            <input type="text" id="p-inst" placeholder="College/University Name" style="width:93%; padding:10px; margin-bottom:5px; border:1px solid #ddd; border-radius:8px;">
+            <input type="text" id="p-inst-city" placeholder="City" style="width:93%; padding:10px; margin-bottom:5px; border:1px solid #ddd; border-radius:8px;">
+            <input type="number" id="p-year" placeholder="Batch Year" style="width:93%; padding:10px; margin-bottom:5px; border:1px solid #ddd; border-radius:8px;">
+            <input type="text" id="p-group" placeholder="Group (e.g. MPC, CSE)" style="width:93%; padding:10px; margin-bottom:5px; border:1px solid #ddd; border-radius:8px;">
+            <button class="btn btn-blue" onclick="saveProfile()">Update Profile</button>
+            <button class="btn" style="background:#ef4444; color:white;" onclick="logout()">Logout</button>
+        </div>
+        <div style="text-align:center; padding:10px;">
+            <a href="privacy.html" style="color:var(--sub); font-size:12px;">Privacy Policy</a>
+        </div>
     </div>
 </div>
 
-<div id="chat-window">
+<div id="chat-window" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200; flex-direction:column;">
     <div class="header">
-        <button onclick="closeChat()" style="background:none; border:none; font-size:20px;">←</button>
-        <div id="chat-with-name" style="font-weight:600; flex:1; margin-left:10px;">Chat</div>
-        <button onclick="blockCurrentChatUser()" style="color:var(--accent); border:none; background:none; font-size:11px;">BLOCK</button>
+        <span onclick="closeChat()"><i class="fas fa-arrow-left"></i> <span id="chat-with-name">Chat</span></span>
     </div>
-    <div id="chat-messages"></div>
-    <div style="padding:10px; background:var(--card); display:flex; gap:10px; align-items:center;">
-        <label style="cursor:pointer; font-size:20px;">📷 <input type="file" id="chatPhotoInput" hidden accept="image/*" onchange="sendPhoto()"> </label>
-        <input type="text" id="privateMsgInput" placeholder="Message..." style="margin:0;">
-        <button class="btn btn-blue" style="width:40px; height:40px; border-radius:50%;" onclick="sendPrivateMessage()">➤</button>
+    <div id="chat-messages" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column;"></div>
+    <div style="padding:10px; background:var(--card); display:flex; gap:10px;">
+        <input type="text" id="privateMsgInput" placeholder="Type a message..." style="flex:1; padding:10px; border-radius:20px; border:1px solid #ddd;">
+        <button onclick="sendPrivateMessage()" style="background:var(--primary); color:white; border:none; border-radius:50%; width:40px; height:40px;"><i class="fas fa-paper-plane"></i></button>
     </div>
 </div>
 
-<nav class="nav-bar">
-    <button class="nav-item active-nav" onclick="show('feed', '', this)">🏠<span>Feed</span></button>
-    <button class="nav-item" onclick="show('friends', '', this)">👥<span>Search</span></button>
-    <button class="nav-item" onclick="show('settings', '', this)">⚙️<span>Profile</span></button>
-</nav>
+<div class="nav-bottom">
+    <div class="nav-item active-nav" onclick="show('feed', event, this)"><i class="fas fa-home"></i><br><small>Feed</small></div>
+    <div class="nav-item" onclick="show('network', event, this)"><i class="fas fa-users"></i><br><small>Network</small></div>
+    <div class="nav-item" onclick="inviteFriend()"><i class="fas fa-user-plus"></i><br><small>Invite</small></div>
+    <div class="nav-item" onclick="show('profile', event, this)"><i class="fas fa-user-circle"></i><br><small>Profile</small></div>
+</div>
 
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script src="app.js"></script>
+
 </body>
 </html>
