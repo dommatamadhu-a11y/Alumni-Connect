@@ -1,3 +1,4 @@
+// --- CONFIGURATION ---
 const firebaseConfig = {
     apiKey: "AIzaSyAWZ2ky33M2U5xSWL-XSkU32y25U-Bwyrc",
     authDomain: "class-connect-b58f0.firebaseapp.com",
@@ -15,24 +16,25 @@ const provider = new firebase.auth.GoogleAuthProvider();
 
 let user = null;
 let currentChatFriendUID = "";
-let initialLoad = true;
+let initialRequestLoad = true;
 
-// --- NOTIFICATION HELPER ---
-function notify(message) {
+// --- NOTIFICATION ENGINE ---
+function notify(message, type = "info") {
     const toast = document.getElementById("toast");
     toast.innerText = message;
+    toast.style.borderLeft = type === "success" ? "5px solid #22c55e" : "5px solid #6366f1";
     toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 3000);
+    setTimeout(() => toast.classList.remove("show"), 3500);
 }
 
-// --- AUTHENTICATION ---
+// --- AUTHENTICATION & SECURE SESSION ---
 auth.onAuthStateChanged((u) => {
     if (u) {
         document.getElementById('login-overlay').style.display = "none";
         db.ref('users/' + u.uid).on('value', snap => {
             const d = snap.val();
             user = { 
-                uid: u.uid, name: u.displayName, photo: d?.photo || u.photoURL, 
+                uid: u.uid, name: u.displayName, email: u.email, photo: d?.photo || u.photoURL, 
                 inst: d?.inst || "", city: d?.city || "", uClass: d?.uClass || "", year: d?.year || "" 
             };
             updateUI();
@@ -49,32 +51,37 @@ function updateUI() {
     document.getElementById('header-user-img').src = user.photo;
     document.getElementById('p-img-large').src = user.photo;
     document.getElementById('p-name-display').innerText = user.name;
+    document.getElementById('p-email-display').innerText = user.email;
     document.getElementById('p-inst').value = user.inst;
     document.getElementById('p-city').value = user.city;
     document.getElementById('p-class').value = user.uClass;
     document.getElementById('p-year').value = user.year;
 }
 
-// --- PROFILE ACTIONS ---
+// --- VALIDATED PROFILE UPDATE ---
 function saveProfile() {
-    const data = {
-        inst: document.getElementById('p-inst').value, 
-        city: document.getElementById('p-city').value,
-        uClass: document.getElementById('p-class').value,
-        year: document.getElementById('p-year').value 
-    };
-    db.ref('users/' + user.uid).update(data).then(() => {
-        notify("Profile Successfully Registered!");
-    });
+    const inst = document.getElementById('p-inst').value.trim();
+    const city = document.getElementById('p-city').value.trim();
+    const uClass = document.getElementById('p-class').value.trim();
+    const year = document.getElementById('p-year').value.trim();
+
+    if(!inst || !city || !uClass || !year) {
+        notify("All educational fields are required for verification!");
+        return;
+    }
+
+    db.ref('users/' + user.uid).update({ inst, city, uClass, year })
+    .then(() => notify("Profile Successfully Registered!", "success"))
+    .catch(() => notify("Failed to update profile. Check connection."));
 }
 
-// --- AUTOMATIC GROUP FEED ---
+// --- AUTOMATIC GROUP FEED (VERIFIED ONLY) ---
 async function handleFeedPost() {
     const txt = document.getElementById('msgInput').value.trim();
     if(!txt) return;
 
     if(!user.inst || !user.year) {
-        notify("Complete your profile to post!");
+        notify("Please complete your profile to post to your batch!");
         return;
     }
 
@@ -83,6 +90,10 @@ async function handleFeedPost() {
     let imgData = "";
     
     if(file) {
+        if(file.size > 2 * 1024 * 1024) { // 2MB Limit
+            notify("Image too large. Max limit is 2MB.");
+            return;
+        }
         const reader = new FileReader();
         imgData = await new Promise(r => { reader.onload = e => r(e.target.result); reader.readAsDataURL(file); });
     }
@@ -90,27 +101,33 @@ async function handleFeedPost() {
     db.ref('posts').push({ 
         uid: user.uid, name: user.name, msg: txt, img: imgData, time: Date.now(), filterKey: groupKey 
     }).then(() => {
-        notify("Post shared with your batch!");
+        notify("Post published successfully!");
         document.getElementById('msgInput').value = "";
         document.getElementById('feedPhotoInput').value = "";
     });
 }
 
 function loadFeed() {
+    const myKey = (user.inst + user.city + user.uClass + user.year).replace(/\s/g, '').toUpperCase();
     db.ref('posts').on('value', snap => {
         const cont = document.getElementById('post-container');
         cont.innerHTML = "";
-        const myKey = (user.inst + user.city + user.uClass + user.year).replace(/\s/g, '').toUpperCase();
-        
+        let hasPosts = false;
+
         snap.forEach(s => {
             const p = s.val();
             if(p.filterKey === myKey) {
+                hasPosts = true;
                 const likes = p.likes ? Object.keys(p.likes).length : 0;
                 const isLiked = p.likes && p.likes[user.uid] ? 'liked' : '';
                 cont.innerHTML = `
                 <div class="card">
-                    <b>${p.name}</b><p>${p.msg}</p>
-                    ${p.img ? `<img src="${p.img}" class="post-img">` : ''}
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                        <img src="${p.uid === user.uid ? user.photo : 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}" width="30" height="30" style="border-radius:50%">
+                        <b>${p.name}</b>
+                    </div>
+                    <p>${p.msg}</p>
+                    ${p.img ? `<img src="${p.img}" class="post-img" loading="lazy">` : ''}
                     <div class="post-actions">
                         <span class="action-btn ${isLiked}" onclick="toggleLike('${s.key}')"><i class="${isLiked?'fas':'far'} fa-heart"></i> ${likes}</span>
                         <span class="action-btn" onclick="toggleComments('${s.key}')"><i class="far fa-comment"></i> Comments</span>
@@ -126,33 +143,35 @@ function loadFeed() {
                 loadComments(s.key);
             }
         });
+        if(!hasPosts) cont.innerHTML = "<div class='card' style='text-align:center; color:#94a3b8;'>No posts in your verified batch group yet.</div>";
     });
 }
 
-// --- SEARCH & CONNECTION NOTIFICATIONS ---
+// --- PRIVACY-FIRST SEARCH ---
 function searchClassmates() {
-    const sInst = document.getElementById('s-inst').value.toUpperCase();
-    const sCity = document.getElementById('s-city').value.toUpperCase();
-    const sClass = document.getElementById('s-class').value.toUpperCase();
-    const sYear = document.getElementById('s-year').value;
+    const sInst = document.getElementById('s-inst').value.toUpperCase().trim();
+    const sCity = document.getElementById('s-city').value.toUpperCase().trim();
+    if(!sInst && !sCity) { notify("Enter Institution or City to search."); return; }
 
     db.ref('users').once('value', snap => {
         const res = document.getElementById('search-results');
         res.innerHTML = "<h4>Search Results</h4>";
+        let found = false;
         snap.forEach(c => {
             const u = c.val();
             if(c.key === user.uid) return;
             const match = (!sInst || (u.inst && u.inst.toUpperCase().includes(sInst))) &&
-                          (!sCity || (u.city && u.city.toUpperCase().includes(sCity))) &&
-                          (!sClass || (u.uClass && u.uClass.toUpperCase().includes(sClass))) &&
-                          (!sYear || u.year == sYear);
-            if(match && (sInst || sCity || sClass || sYear)) {
+                          (!sCity || (u.city && u.city.toUpperCase().includes(sCity)));
+            
+            if(match) {
+                found = true;
                 res.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                    <div><b>${u.name}</b><br><small>${u.uClass || ''} • ${u.inst || ''}</small></div>
+                    <div><b>${u.name}</b><br><small>${u.inst || 'Private'} • ${u.year || ''}</small></div>
                     <button class="btn-blue" style="width:auto; padding:8px 15px;" onclick="connect('${c.key}','${u.name}')">Connect</button>
                 </div>`;
             }
         });
+        if(!found) res.innerHTML += "<p style='text-align:center; padding:20px; color:var(--sub)'>No matches found.</p>";
     });
 }
 
@@ -160,12 +179,13 @@ function connect(uid, name) {
     db.ref('friends/' + user.uid + '/' + uid).once('value', s => {
         if(s.exists()) openChat(uid, name);
         else {
-            db.ref('friend_requests/' + uid + '/' + user.uid).set({ fromName: user.name })
-            .then(() => notify("Request Sent Successfully!"));
+            db.ref('friend_requests/' + uid + '/' + user.uid).set({ fromName: user.name, fromPhoto: user.photo })
+            .then(() => notify("Request Sent Successfully!", "success"));
         }
     });
 }
 
+// --- SECURE REQUEST LISTENER ---
 function listenForRequests() {
     db.ref('friend_requests/' + user.uid).on('value', snap => {
         const list = document.getElementById('requests-list');
@@ -173,19 +193,19 @@ function listenForRequests() {
         if(snap.exists()){
             document.getElementById('requests-section').style.display = "block";
             dot.style.display = "block";
-            if(!initialLoad) notify("You have a new connection request!");
+            if(!initialRequestLoad) notify("You have a new connection request!");
             list.innerHTML = "";
             snap.forEach(s => {
-                list.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                list.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:5px; background:#fff; border-radius:10px;">
                     <span><b>${s.val().fromName}</b></span>
-                    <button class="btn-blue" style="width:auto; padding:5px 10px;" onclick="accept('${s.key}', '${s.val().fromName}')">Accept</button>
+                    <button class="btn-blue" style="width:auto; padding:5px 12px; font-size:12px;" onclick="accept('${s.key}', '${s.val().fromName}')">Accept</button>
                 </div>`;
             });
         } else {
             document.getElementById('requests-section').style.display = "none";
             dot.style.display = "none";
         }
-        initialLoad = false;
+        initialRequestLoad = false;
     });
 }
 
@@ -193,10 +213,10 @@ function accept(fid, name) {
     db.ref('friends/' + user.uid + '/' + fid).set(true);
     db.ref('friends/' + fid + '/' + user.uid).set(true);
     db.ref('friend_requests/' + user.uid + '/' + fid).remove()
-    .then(() => notify("You are now connected with " + name));
+    .then(() => notify("You are now connected with " + name, "success"));
 }
 
-// --- MESSAGE NOTIFICATIONS ---
+// --- REAL-TIME PRIVATE MESSAGING ---
 function listenForMessages() {
     db.ref('friends/' + user.uid).on('child_added', snap => {
         const fid = snap.key;
@@ -204,7 +224,7 @@ function listenForMessages() {
         db.ref('private_messages/' + cid).limitToLast(1).on('child_added', m => {
             const msg = m.val();
             if(msg.sender !== user.uid && (Date.now() - msg.time < 3000)) {
-                notify("New message received!");
+                notify("New secure message received!");
             }
         });
     });
@@ -218,7 +238,6 @@ function sendPrivateMessage() {
     document.getElementById('privateMsgInput').value = "";
 }
 
-// --- CHAT WINDOW ---
 function openChat(uid, name) {
     currentChatFriendUID = uid;
     document.getElementById('chat-with-name').innerText = name;
@@ -234,7 +253,7 @@ function openChat(uid, name) {
 
 function closeChat() { document.getElementById('chat-window').style.display = "none"; }
 
-// --- UI HELPERS ---
+// --- CORE UI HELPERS ---
 function show(id, event, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
@@ -263,6 +282,6 @@ function loadComments(pid) {
         snap.forEach(s => { list.innerHTML += `<div class="comment-item"><b>${s.val().name}:</b> ${s.val().text}</div>`; });
     });
 }
-function loginWithGoogle() { auth.signInWithPopup(provider); }
+function loginWithGoogle() { auth.signInWithPopup(provider).catch(e => notify("Login failed: " + e.message)); }
 function logout() { auth.signOut().then(() => location.reload()); }
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
