@@ -1,10 +1,7 @@
 {
-  "name": "Alumni Connect",
-  "short_name": "AlumniConnect",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#6366f1",
+  "short_name": "ClassConnect",
+  "name": "Classmate Connect",
+  "description": "Reconnect with your classmates based on institution, city, and batch.",
   "icons": [
     {
       "src": "logo.png",
@@ -16,5 +13,10 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "start_url": "./index.html",
+  "display": "standalone",
+  "theme_color": "#6366f1",
+  "background_color": "#f8fafc",
+  "orientation": "portrait"
 }
