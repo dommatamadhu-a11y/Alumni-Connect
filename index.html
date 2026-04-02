@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --primary: #6366f1; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --sub: #64748b; --danger: #ef4444; }
+        :root { --primary: #6366f1; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --sub: #64748b; --danger: #ef4444; --success: #22c55e; }
         .dark-mode { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --sub: #94a3b8; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 75px; transition: 0.3s; }
         
@@ -39,16 +39,17 @@
         .theirs { background: #e2e8f0; color: #333; align-self: flex-start; }
         
         #login-overlay { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        #toast { visibility: hidden; min-width: 200px; background: #333; color: #fff; text-align: center; padding: 12px; position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); border-radius: 30px; z-index: 1000; }
-        #toast.show { visibility: visible; }
+        #toast { visibility: hidden; min-width: 250px; background: #333; color: #fff; text-align: center; padding: 14px; position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); border-radius: 30px; z-index: 1000; font-weight: 500; }
+        #toast.show { visibility: visible; animation: slideUp 0.3s; }
+        @keyframes slideUp { from { bottom: 0; opacity: 0; } to { bottom: 90px; opacity: 1; } }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
     <h2 style="color:var(--primary)">Classmate Connect</h2>
-    <p>Join your institutional network today.</p>
-    <button class="btn btn-blue" style="width:200px" onclick="loginWithGoogle()"><i class="fab fa-google"></i> Sign in with Google</button>
+    <p>Sign in to start connecting.</p>
+    <button class="btn btn-blue" style="width:220px" onclick="loginWithGoogle()"><i class="fab fa-google"></i> Sign in with Google</button>
 </div>
 
 <div class="header">
@@ -59,25 +60,25 @@
 <div class="container">
     <div id="feed" class="section active">
         <div class="card">
-            <textarea id="msgInput" placeholder="Write a post to your batch group..."></textarea>
+            <textarea id="msgInput" placeholder="Share an update with your batch..."></textarea>
             <input type="file" id="feedPhotoInput" accept="image/*">
-            <button class="btn btn-blue" onclick="handleFeedPost()">Post to Group</button>
+            <button class="btn btn-blue" onclick="handleFeedPost()">Post to Batch</button>
         </div>
         <div id="post-container"></div>
     </div>
 
     <div id="network" class="section">
         <div id="requests-section" class="card" style="display:none; border: 2px solid var(--primary);">
-            <h4 style="margin-top:0;"><i class="fas fa-user-plus"></i> Pending Requests</h4>
+            <h4 style="margin-top:0;"><i class="fas fa-user-clock"></i> Pending Requests</h4>
             <div id="requests-list"></div>
         </div>
         <div class="card">
-            <h4><i class="fas fa-search"></i> Advanced Search</h4>
+            <h4><i class="fas fa-search"></i> Find Classmates</h4>
             <input type="text" id="s-inst" placeholder="Institution Name">
             <input type="text" id="s-city" placeholder="Institution City">
-            <input type="text" id="s-class" placeholder="Course / Class">
+            <input type="text" id="s-class" placeholder="Class / Branch">
             <input type="number" id="s-year" placeholder="Passout Year">
-            <button class="btn btn-blue" onclick="searchClassmates()">Search Members</button>
+            <button class="btn btn-blue" onclick="searchClassmates()">Search</button>
         </div>
         <div id="search-results"></div>
     </div>
@@ -88,13 +89,13 @@
             <h3 id="p-name-display"></h3>
         </div>
         <div class="card">
-            <h4>Education & Batch Details</h4>
+            <h4>Profile Settings</h4>
             <input type="text" id="p-inst" placeholder="Institution Name">
             <input type="text" id="p-city" placeholder="Institution City">
             <input type="text" id="p-class" placeholder="Class / Branch">
             <input type="number" id="p-year" placeholder="Passout Year">
-            <button class="btn btn-blue" onclick="saveProfile()">Update Profile</button>
-            <button class="btn" style="margin-top:10px; background:#e2e8f0; color:#475569;" onclick="logout()">Logout</button>
+            <button class="btn btn-blue" onclick="saveProfile()">Save Profile</button>
+            <button class="btn" style="margin-top:10px; background:#f1f5f9; color:#475569;" onclick="logout()">Logout</button>
         </div>
     </div>
 </div>
@@ -113,10 +114,10 @@
 <div class="nav-bottom">
     <div class="nav-item active-nav" onclick="show('feed', event, this)"><i class="fas fa-home"></i></div>
     <div class="nav-item" onclick="show('network', event, this)">
-        <i class="fas fa-user-friends"></i>
+        <i class="fas fa-users"></i>
         <div id="request-dot" class="notification-dot"></div>
     </div>
-    <div class="nav-item" onclick="show('profile', event, this)"><i class="fas fa-user-circle"></i></div>
+    <div class="nav-item" onclick="show('profile', event, this)"><i class="fas fa-user-cog"></i></div>
 </div>
 
 <div id="toast"></div>
