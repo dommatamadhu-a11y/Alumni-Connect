@@ -17,23 +17,29 @@ let user = null;
 let currentChatFriendUID = "";
 let blockedUsers = [];
 
-// --- NOTIFICATION UTILITY ---
 function notify(msg) {
     const t = document.getElementById("toast");
     t.innerText = msg; t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), 3000);
 }
 
-// --- AUTH & USER DATA ---
+// Time Formatting Logic
+function formatTime(ts) {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(mins / 60);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(ts).toLocaleDateString();
+}
+
 auth.onAuthStateChanged((u) => {
     if (u) {
         document.getElementById('login-overlay').style.display = "none";
         db.ref('users/' + u.uid).on('value', snap => {
             const d = snap.val();
-            user = { 
-                uid: u.uid, name: u.displayName, photo: d?.photo || u.photoURL, 
-                inst: d?.inst||"", city: d?.city||"", uClass: d?.uClass||"", year: d?.year||"" 
-            };
+            user = { uid: u.uid, name: u.displayName, photo: d?.photo || u.photoURL, inst: d?.inst||"", city: d?.city||"", uClass: d?.uClass||"", year: d?.year||"" };
             blockedUsers = d?.blocked || [];
             updateUI(); loadFeed(); listenForRequests(); listenForMessages();
         });
@@ -50,11 +56,10 @@ function updateUI() {
     document.getElementById('p-year').value = user.year;
 }
 
-// --- BATCH FEED WITH LIKES & COMMENTS ---
+// --- FEED WITH FORMATTED TIME ---
 async function handleFeedPost() {
     const txt = document.getElementById('msgInput').value.trim();
-    if(!txt || !user.inst) return notify("Please complete profile first.");
-    
+    if(!txt || !user.inst) return notify("Complete profile to post!");
     const groupKey = (user.inst + user.city + user.uClass + user.year).replace(/\s/g, '').toUpperCase();
     const file = document.getElementById('feedPhotoInput').files[0];
     let imgData = "";
@@ -62,14 +67,8 @@ async function handleFeedPost() {
         const reader = new FileReader();
         imgData = await new Promise(r => { reader.onload = e => r(e.target.result); reader.readAsDataURL(file); });
     }
-
-    db.ref('posts').push({ 
-        uid: user.uid, name: user.name, msg: txt, img: imgData, time: Date.now(), filterKey: groupKey 
-    }).then(() => {
-        notify("Post published!");
-        document.getElementById('msgInput').value = "";
-        document.getElementById('feedPhotoInput').value = "";
-    });
+    db.ref('posts').push({ uid: user.uid, name: user.name, msg: txt, img: imgData, time: Date.now(), filterKey: groupKey })
+    .then(() => { notify("Posted!"); document.getElementById('msgInput').value = ""; });
 }
 
 function loadFeed() {
@@ -83,11 +82,8 @@ function loadFeed() {
                 const isLiked = p.likes && p.likes[user.uid] ? 'liked' : '';
                 cont.innerHTML = `
                 <div class="card">
-                    <span class="report-btn" onclick="reportContent('${s.key}')">Report</span>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <img src="${p.uid === user.uid ? user.photo : 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}" width="30" height="30" style="border-radius:50%">
-                        <b>${p.name}</b>
-                    </div>
+                    <span class="report-btn" onclick="reportPost('${s.key}')">Report</span>
+                    <b>${p.name}</b> <small style="color:gray">• ${formatTime(p.time)}</small>
                     <p>${p.msg}</p>
                     ${p.img ? `<img src="${p.img}" class="post-img">` : ''}
                     <div class="post-actions">
@@ -96,10 +92,7 @@ function loadFeed() {
                     </div>
                     <div id="comment-area-${s.key}" class="comment-section">
                         <div id="list-${s.key}"></div>
-                        <div style="display:flex; gap:5px; margin-top:10px;">
-                            <input type="text" id="in-${s.key}" placeholder="Add a comment..." style="margin:0;">
-                            <button onclick="addComment('${s.key}')" class="btn-blue" style="width:40px;">></button>
-                        </div>
+                        <div style="display:flex; gap:5px; margin-top:10px;"><input type="text" id="in-${s.key}" placeholder="Comment..."><button onclick="addComment('${s.key}')" class="btn-blue">></button></div>
                     </div>
                 </div>` + cont.innerHTML;
                 loadComments(s.key);
@@ -108,35 +101,7 @@ function loadFeed() {
     });
 }
 
-function toggleLike(pid) {
-    const ref = db.ref(`posts/${pid}/likes/${user.uid}`);
-    ref.once('value', s => s.exists() ? ref.remove() : ref.set(true));
-}
-
-function toggleComments(pid) {
-    const el = document.getElementById(`comment-area-${pid}`);
-    el.style.display = el.style.display === "block" ? "none" : "block";
-}
-
-function addComment(pid) {
-    const val = document.getElementById(`in-${pid}`).value.trim();
-    if(val) {
-        db.ref(`posts/${pid}/comments`).push({ name: user.name, text: val });
-        document.getElementById(`in-${pid}`).value = "";
-    }
-}
-
-function loadComments(pid) {
-    db.ref(`posts/${pid}/comments`).on('value', snap => {
-        const list = document.getElementById(`list-${pid}`);
-        if(list) {
-            list.innerHTML = "";
-            snap.forEach(s => { list.innerHTML += `<div class="comment-item"><b>${s.val().name}:</b> ${s.val().text}</div>`; });
-        }
-    });
-}
-
-// --- ADVANCED SEARCH FILTER ---
+// --- SEARCH WITH 4 FILTERS ---
 function searchClassmates() {
     const sInst = document.getElementById('s-inst').value.toUpperCase().trim();
     const sCity = document.getElementById('s-city').value.toUpperCase().trim();
@@ -144,9 +109,7 @@ function searchClassmates() {
     const sYear = document.getElementById('s-year').value.trim();
 
     db.ref('users').once('value', snap => {
-        const res = document.getElementById('search-results');
-        res.innerHTML = "<h4>Search Results</h4>";
-        let found = false;
+        const res = document.getElementById('search-results'); res.innerHTML = "<h4>Results</h4>";
         snap.forEach(c => {
             const u = c.val(); if(c.key === user.uid) return;
             const match = (!sInst || (u.inst && u.inst.toUpperCase().includes(sInst))) &&
@@ -154,18 +117,16 @@ function searchClassmates() {
                           (!sClass || (u.uClass && u.uClass.toUpperCase().includes(sClass))) &&
                           (!sYear || (u.year && u.year.toString() === sYear));
             if(match) {
-                found = true;
                 res.innerHTML += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                    <div><b>${u.name}</b><br><small>${u.inst || ''} | ${u.year || ''}</small></div>
-                    <button class="btn-blue" style="width:auto; padding:5px 12px;" onclick="connect('${c.key}','${u.name}')">Connect</button>
+                    <div><b>${u.name}</b><br><small>${u.inst || ''} (${u.year || ''})</small></div>
+                    <button class="btn-blue" style="width:auto; padding:5px 10px;" onclick="connect('${c.key}','${u.name}')">Connect</button>
                 </div>`;
             }
         });
-        if(!found) res.innerHTML += "<p style='text-align:center; color:var(--sub)'>No matches found.</p>";
     });
 }
 
-// --- PRIVATE CHAT WITH IMAGES & DELETE ---
+// --- CHAT WITH IMAGES & DELETE ---
 function sendPrivateMessage() {
     const txt = document.getElementById('privateMsgInput').value.trim();
     if(txt) { pushMsg({ type: 'text', content: txt }); document.getElementById('privateMsgInput').value = ""; }
@@ -186,9 +147,9 @@ function pushMsg(obj) {
 }
 
 function deleteMsg(msgId) {
-    if(confirm("Delete this message for everyone?")) {
+    if(confirm("Delete for everyone?")) {
         const cid = user.uid < currentChatFriendUID ? user.uid+'_'+currentChatFriendUID : currentChatFriendUID+'_'+user.uid;
-        db.ref(`private_messages/${cid}/${msgId}`).remove().then(() => notify("Message Deleted"));
+        db.ref(`private_messages/${cid}/${msgId}`).remove();
     }
 }
 
@@ -196,7 +157,6 @@ function openChat(uid, name) {
     currentChatFriendUID = uid;
     document.getElementById('chat-with-name').innerText = name;
     document.getElementById('chat-window').style.display = "flex";
-    updateChatUI();
     const cid = user.uid < uid ? user.uid+'_'+uid : uid+'_'+user.uid;
     db.ref('private_messages/' + cid).on('value', snap => {
         const c = document.getElementById('chat-messages'); c.innerHTML = "";
@@ -205,7 +165,7 @@ function openChat(uid, name) {
             const isMine = m.sender === user.uid;
             const div = document.createElement('div');
             div.className = `msg-bubble ${isMine ? 'mine' : 'theirs'}`;
-            div.innerHTML = m.type === 'image' ? `<img src="${m.content}" class="chat-img">` : m.content;
+            div.innerHTML = (m.type === 'image' ? `<img src="${m.content}" class="chat-img">` : m.content) + `<br><small style="font-size:9px; opacity:0.7">${formatTime(m.time)}</small>`;
             if(isMine) div.onclick = () => deleteMsg(s.key);
             c.appendChild(div);
         });
@@ -213,84 +173,66 @@ function openChat(uid, name) {
     });
 }
 
-// --- BLOCKING & SECURITY ---
+// --- OTHERS (Like, Comment, Profile, Block) ---
+function toggleLike(pid) {
+    const ref = db.ref(`posts/${pid}/likes/${user.uid}`);
+    ref.once('value', s => s.exists() ? ref.remove() : ref.set(true));
+}
+function addComment(pid) {
+    const val = document.getElementById(`in-${pid}`).value.trim();
+    if(val) { db.ref(`posts/${pid}/comments`).push({ name: user.name, text: val }); document.getElementById(`in-${pid}`).value = ""; }
+}
+function loadComments(pid) {
+    db.ref(`posts/${pid}/comments`).on('value', snap => {
+        const list = document.getElementById(`list-${pid}`); if(!list) return;
+        list.innerHTML = "";
+        snap.forEach(s => { list.innerHTML += `<div class="comment-item"><b>${s.val().name}:</b> ${s.val().text}</div>`; });
+    });
+}
 function toggleBlock() {
-    if(blockedUsers.includes(currentChatFriendUID)) {
-        blockedUsers = blockedUsers.filter(id => id !== currentChatFriendUID);
-    } else {
-        if(confirm("Block this user?")) blockedUsers.push(currentChatFriendUID);
-    }
+    if(blockedUsers.includes(currentChatFriendUID)) blockedUsers = blockedUsers.filter(id => id !== currentChatFriendUID);
+    else if(confirm("Block user?")) blockedUsers.push(currentChatFriendUID);
     db.ref('users/' + user.uid + '/blocked').set(blockedUsers);
-    updateChatUI();
 }
-
-function updateChatUI() {
-    const isB = blockedUsers.includes(currentChatFriendUID);
-    document.getElementById('chat-input-area').style.display = isB ? "none" : "flex";
-    document.getElementById('blocked-msg').style.display = isB ? "block" : "none";
-    document.getElementById('block-btn').innerText = isB ? "Unblock" : "Block";
+function saveProfile() {
+    const d = { inst: document.getElementById('p-inst').value, city: document.getElementById('p-city').value, uClass: document.getElementById('p-class').value, year: document.getElementById('p-year').value };
+    db.ref('users/' + user.uid).update(d).then(() => notify("Saved!"));
 }
-
-function reportContent(pid) {
-    if(confirm("Report this post?")) { db.ref('reports').push({ post: pid, by: user.uid }); notify("Reported."); }
-}
-
-// --- REQUESTS & NETWORK ---
 function connect(uid, name) {
     db.ref('friends/'+user.uid+'/'+uid).once('value', s => {
         if(s.exists()) openChat(uid, name);
-        else db.ref('friend_requests/'+uid+'/'+user.uid).set({ fromName: user.name }).then(() => notify("Request Sent!"));
+        else db.ref('friend_requests/'+uid+'/'+user.uid).set({ fromName: user.name }).then(() => notify("Sent!"));
     });
 }
-
 function listenForRequests() {
     db.ref('friend_requests/'+user.uid).on('value', snap => {
         const dot = document.getElementById('request-dot');
         if(snap.exists()) {
             dot.style.display = "block";
             const list = document.getElementById('requests-list'); list.innerHTML = "";
-            snap.forEach(s => { list.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><span><b>${s.val().fromName}</b></span> <button class="btn-blue" style="width:auto; padding:5px 10px;" onclick="accept('${s.key}','${s.val().fromName}')">Accept</button></div>`; });
+            snap.forEach(s => { list.innerHTML += `<div>${s.val().fromName} <button onclick="accept('${s.key}')">Accept</button></div>`; });
             document.getElementById('requests-section').style.display = "block";
         } else { dot.style.display = "none"; document.getElementById('requests-section').style.display = "none"; }
     });
 }
-
-function accept(fid, name) {
+function accept(fid) {
     db.ref('friends/'+user.uid+'/'+fid).set(true); db.ref('friends/'+fid+'/'+user.uid).set(true);
-    db.ref('friend_requests/'+user.uid+'/'+fid).remove().then(() => notify("Connected with " + name));
+    db.ref('friend_requests/'+user.uid+'/'+fid).remove();
 }
-
 function listenForMessages() {
     db.ref('friends/' + user.uid).on('child_added', snap => {
         const fid = snap.key; const cid = user.uid < fid ? user.uid+'_'+fid : fid+'_'+user.uid;
         db.ref('private_messages/' + cid).limitToLast(1).on('child_added', m => {
-            if(m.val().sender !== user.uid && !blockedUsers.includes(m.val().sender) && (Date.now() - m.val().time < 3000)) notify("New Message Received!");
+            if(m.val().sender !== user.uid && !blockedUsers.includes(m.val().sender) && (Date.now() - m.val().time < 3000)) notify("New Message!");
         });
     });
 }
-
-// --- PROFILE & SETTINGS ---
-function saveProfile() {
-    const d = { 
-        inst: document.getElementById('p-inst').value, 
-        city: document.getElementById('p-city').value, 
-        uClass: document.getElementById('p-class').value, 
-        year: document.getElementById('p-year').value 
-    };
-    db.ref('users/' + user.uid).update(d).then(() => notify("Profile Updated Successfully!"));
-}
-
-function inviteFriends() { 
-    const msg = `Connect with our batchmates on Classmate Connect! Join here: ${window.location.href}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank'); 
-}
-
+function inviteFriends() { window.open(`https://wa.me/?text=Join Classmate Connect: ${window.location.href}`, '_blank'); }
 function show(id, e, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
     document.getElementById(id).classList.add('active'); el.classList.add('active-nav');
 }
-
 function loginWithGoogle() { auth.signInWithPopup(provider); }
 function logout() { auth.signOut().then(() => location.reload()); }
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
