@@ -1,47 +1,55 @@
-# 🎓 Global Alumni Connect
+# 🔗 Classmate Connect
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Firebase](https://img.shields.io/badge/Backend-Firebase-orange.svg)
-![Platform](https://img.shields.io/badge/Platform-Web%20%2F%20Android-green.svg)
-
-**Global Alumni Connect** is a professional networking platform designed to bridge the gap between alumni, students, and educational institutions worldwide. Built with a vision to connect millions of graduates, it facilitates career growth, mentorship, and community building.
+**Classmate Connect** is a social networking platform designed to help students and alumni reconnect based on their educational institutions, city, and specific classes or courses.
 
 ---
 
-## 🚀 Key Features
+## 🚀 Features
 
-- **🌐 Global Reach:** Connect with batchmates and seniors from your institution, regardless of their current location.
-- **🔐 Secure Authentication:** Seamless and secure login experience using **Google Firebase Auth**.
-- **📝 Interactive Feed:** Share updates, professional achievements, and news with your specific alumni group.
-- **📊 Real-time Polls:** Conduct surveys and gather opinions within your community.
-- **💬 Private Messaging:** Secure, real-time one-on-one chat with end-to-end connectivity.
-- **🌓 Dark Mode:** Optimized user interface for both light and dark environments.
-- **📱 Responsive Design:** Fully functional across Mobile, Tablet, and Desktop devices.
+* **Smart Search:** Filter classmates by Institution Name, City, Passout Year, and Studying Class/Course.
+* **Friend Request System:** Ensures privacy by allowing users to chat only after a connection request is accepted.
+* **Personalized Home Feed:** View and share updates with classmates belonging to the same institution and batch.
+* **Social Interactions:** Engage with posts using the **Like (Love icon)** and **Comment** features.
+* **Real-time Messaging:** Direct and secure private chat functionality between connected friends.
+* **Live Notifications:** Visual indicators (notification dots) for new friend requests and unread messages.
+* **Responsive Design:** Fully optimized for mobile and desktop views with **Dark Mode** support.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Technologies Used
 
-- **Frontend:** HTML5, CSS3 (Modern UI/UX), JavaScript (ES6+)
-- **Backend-as-a-Service:** Google Firebase
-- **Database:** Firebase Realtime Database
-- **Hosting:** GitHub Pages
-- **Mobile Integration:** Android Studio (WebView Architecture)
+* **Frontend:** HTML5, CSS3 (Custom Properties & Flexbox), JavaScript (ES6+)
+* **Backend:** Firebase Realtime Database
+* **Authentication:** Firebase Google Auth
+* **Icons:** Font Awesome 6.0
 
 ---
 
 ## 📸 Screenshots
 
-| Login Page | Global Feed | Private Chat |
-|------------|-------------|--------------|
-| ![Login](https://via.placeholder.com/200x400?text=Login+UI) | ![Feed](https://via.placeholder.com/200x400?text=Alumni+Feed) | ![Chat](https://via.placeholder.com/200x400?text=Real-time+Chat) |
-
-*(Note: Replace placeholders with actual app screenshots for better impact)*
+> *Add your app screenshots here to showcase the UI*
 
 ---
 
-## 🔧 Installation & Setup
+## ⚙️ Setup & Installation
 
-1. **Clone the Repository:**
-   ```bash
-   git clone [https://github.com/dommatamadhu-a11y/Alumni-Connect.git](https://github.com/dommatamadhu-a11y/Alumni-Connect.git)
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/your-username/classmate-connect.git](https://github.com/your-username/classmate-connect.git)
+    ```
+2.  **Configure Firebase:**
+    * Open `app.js`.
+    * Replace the `firebaseConfig` object with your own Firebase project credentials.
+3.  **Run the app:**
+    * Simply open `index.html` in any modern web browser.
+
+---
+
+## 📂 Folder Structure
+
+```text
+classmate-connect/
+├── index.html    # Main User Interface
+├── app.js        # Firebase Logic & Application Functionality
+├── logo.png      # Application Logo
+└── README.md     # Project Documentation
