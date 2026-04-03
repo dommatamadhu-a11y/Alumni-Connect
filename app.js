@@ -54,10 +54,10 @@ function updateUI() {
     document.getElementById('p-year').value = user.year;
 }
 
-// FEED LOGIC
+// FEED
 async function handleFeedPost() {
     const txt = document.getElementById('msgInput').value.trim();
-    if(!txt || !user.inst) return notify("Set your institution first!");
+    if(!txt || !user.inst) return notify("Complete your profile first!");
     const key = (user.inst + user.city + user.uClass + user.year).replace(/\s/g, '').toUpperCase();
     const file = document.getElementById('feedPhotoInput').files[0];
     let img = "";
@@ -79,10 +79,7 @@ function loadFeed() {
                 const isLiked = p.likes && p.likes[user.uid] ? 'liked' : '';
                 cont.innerHTML = `
                 <div class="card">
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <img src="${p.uid === user.uid ? user.photo : 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}" width="30" style="border-radius:50%">
-                        <b>${p.name}</b> <small style="color:var(--sub)">• ${formatTime(p.time)}</small>
-                    </div>
+                    <b>${p.name}</b> <small style="color:var(--sub)">• ${formatTime(p.time)}</small>
                     <p>${p.msg}</p>
                     ${p.img ? `<img src="${p.img}" class="post-img">` : ''}
                     <div class="post-actions">
@@ -171,12 +168,12 @@ function toggleLike(pid) { const ref = db.ref(`posts/${pid}/likes/${user.uid}`);
 function toggleComments(pid) { const el = document.getElementById(`comment-area-${pid}`); el.style.display = el.style.display === "block" ? "none" : "block"; }
 function addComment(pid) { const v = document.getElementById(`in-${pid}`).value.trim(); if(v) { db.ref(`posts/${pid}/comments`).push({ name: user.name, text: v }); document.getElementById(`in-${pid}`).value = ""; } }
 function loadComments(pid) { db.ref(`posts/${pid}/comments`).on('value', s => { const l = document.getElementById(`list-${pid}`); if(l) { l.innerHTML = ""; s.forEach(c => { l.innerHTML += `<div class="comment-item"><b>${c.val().name}:</b> ${c.val().text}</div>`; }); } }); }
-function toggleBlock() { if(confirm("Block user?")) { blockedUsers.push(currentChatFriendUID); db.ref('users/' + user.uid + '/blocked').set(blockedUsers); notify("Blocked."); } }
-function saveProfile() { const d = { inst: document.getElementById('p-inst').value, city: document.getElementById('p-city').value, uClass: document.getElementById('p-class').value, year: document.getElementById('p-year').value }; db.ref('users/' + user.uid).update(d).then(() => notify("Updated!")); }
+function toggleBlock() { if(confirm("Block this user?")) { blockedUsers.push(currentChatFriendUID); db.ref('users/' + user.uid + '/blocked').set(blockedUsers); notify("User Blocked."); } }
+function saveProfile() { const d = { inst: document.getElementById('p-inst').value, city: document.getElementById('p-city').value, uClass: document.getElementById('p-class').value, year: document.getElementById('p-year').value }; db.ref('users/' + user.uid).update(d).then(() => notify("Profile Updated!")); }
 function connect(uid, name) { db.ref('friends/'+user.uid+'/'+uid).once('value', s => { if(s.exists()) openChat(uid, name); else db.ref('friend_requests/'+uid+'/'+user.uid).set({ fromName: user.name }).then(() => notify("Request Sent!")); }); }
 function listenForRequests() { db.ref('friend_requests/'+user.uid).on('value', snap => { const dot = document.getElementById('request-dot'); if(snap.exists()) { dot.style.display = "block"; document.getElementById('requests-section').style.display = "block"; const list = document.getElementById('requests-list'); list.innerHTML = ""; snap.forEach(s => { list.innerHTML += `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${s.val().fromName}</span> <button onclick="accept('${s.key}')" class="btn-blue" style="width:auto; padding:4px 8px;">Accept</button></div>`; }); } else { dot.style.display = "none"; document.getElementById('requests-section').style.display = "none"; } }); }
 function accept(fid) { db.ref('friends/'+user.uid+'/'+fid).set(true); db.ref('friends/'+fid+'/'+user.uid).set(true); db.ref('friend_requests/'+user.uid+'/'+fid).remove(); }
-function listenForMessages() { db.ref('friends/' + user.uid).on('child_added', snap => { const fid = snap.key; const cid = user.uid < fid ? user.uid+'_'+fid : fid+'_'+user.uid; db.ref('private_messages/' + cid).limitToLast(1).on('child_added', m => { if(m.val().sender !== user.uid && !blockedUsers.includes(m.val().sender) && (Date.now() - m.val().time < 3000)) notify("New Chat Message!"); }); }); }
+function listenForMessages() { db.ref('friends/' + user.uid).on('child_added', snap => { const fid = snap.key; const cid = user.uid < fid ? user.uid+'_'+fid : fid+'_'+user.uid; db.ref('private_messages/' + cid).limitToLast(1).on('child_added', m => { if(m.val().sender !== user.uid && !blockedUsers.includes(m.val().sender) && (Date.now() - m.val().time < 3000)) notify("New Message!"); }); }); }
 function inviteFriends() { window.open(`https://wa.me/?text=Join Classmate Connect: https://dommatamadhu-a11y.github.io/Classmate-Connect/`, '_blank'); }
 function show(id, e, el) { document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav')); document.getElementById(id).classList.add('active'); el.classList.add('active-nav'); }
 function loginWithGoogle() { auth.signInWithPopup(provider); }
