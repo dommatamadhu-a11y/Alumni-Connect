@@ -10,6 +10,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Classmate Connect">
     <meta name="theme-color" content="#6366f1">
     <link rel="manifest" href="manifest.json">
 
@@ -35,7 +36,6 @@
         input, textarea { width: 93%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 10px; background: var(--card); color: var(--text); outline: none; font-size: 14px; }
         .btn { padding: 12px; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
         .btn-blue { background: var(--primary); color: white; }
-        .btn-wa { background: var(--whatsapp); color: white; margin-top: 10px; }
         
         .post-img, .chat-img { width: 100%; border-radius: 10px; margin-top: 10px; max-height: 300px; object-fit: cover; }
         .post-actions { display: flex; gap: 20px; padding: 10px 0; border-top: 1px solid rgba(0,0,0,0.05); margin-top: 10px; }
@@ -72,7 +72,7 @@
 <div class="container">
     <div id="feed" class="section active">
         <div class="card">
-            <textarea id="msgInput" placeholder="What's on your mind?"></textarea>
+            <textarea id="msgInput" placeholder="Post something to your batch..."></textarea>
             <div style="display:flex; gap:10px; align-items:center;">
                 <input type="file" id="feedPhotoInput" accept="image/*" style="font-size:11px; flex:1;">
                 <button class="btn btn-blue" style="width:100px" onclick="handleFeedPost()">Post</button>
@@ -101,7 +101,7 @@
         <div class="card" style="text-align:center;">
             <img id="p-img-large" src="" style="width:100px; height:100px; border-radius:50%; border:4px solid var(--primary); object-fit:cover;">
             <h3 id="p-name-display" style="margin:10px 0 5px 0;"></h3>
-            <button class="btn btn-wa" onclick="inviteFriends()"><i class="fab fa-whatsapp"></i> Invite via WhatsApp</button>
+            <button class="btn" style="background:var(--whatsapp); color:white; margin-top:10px;" onclick="inviteFriends()"><i class="fab fa-whatsapp"></i> Invite via WhatsApp</button>
         </div>
         <div class="card">
             <h4>Academic Profile</h4>
@@ -127,7 +127,6 @@
         <input type="text" id="privateMsgInput" placeholder="Type a message..." style="flex:1; margin-bottom:0;">
         <button onclick="sendPrivateMessage()" class="btn-blue" style="width:45px; height:45px; border-radius:50%;"><i class="fas fa-paper-plane"></i></button>
     </div>
-    <div id="blocked-msg" style="display:none; padding:20px; text-align:center; color:var(--danger); background:#fee2e2;">Blocked. Unblock to chat.</div>
 </div>
 
 <div class="nav-bottom">
