@@ -1,4 +1,3 @@
-// --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyAWZ2ky33M2U5xSWL-XSkU32y25U-Bwyrc",
   authDomain: "class-connect-b58f0.firebaseapp.com",
@@ -10,7 +9,6 @@ const firebaseConfig = {
   measurementId: "G-8QT4VQ5YW5"
 };
 
-// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
@@ -54,7 +52,6 @@ function search() {
         const r = document.getElementById('search-results'); r.innerHTML = "<h4>Search Results</h4>";
         snap.forEach(c => {
             const u = c.val(); if(c.key === user.uid) return;
-            
             const matchInst = !sInst || (u.inst && u.inst.toUpperCase().includes(sInst));
             const matchCity = !sCity || (u.city && u.city.toUpperCase().includes(sCity));
             const matchClass = !sClass || (u.uClass && u.uClass.toUpperCase().includes(sClass));
@@ -70,7 +67,7 @@ function search() {
     });
 }
 
-// --- FEED & DELETION ---
+// --- FEED & POST DELETION ---
 async function handlePost() {
     const txt = document.getElementById('msgInput').value.trim();
     if(!txt || !user.inst) return notify("Please set your profile first!");
@@ -152,7 +149,7 @@ function loadFriends() {
 
 // --- SYSTEM UTILS ---
 function clearHistory() { if(confirm("Clear history?")) db.ref(`private_messages/${(user.uid < activeFriend ? user.uid+'_'+activeFriend : activeFriend+'_'+user.uid)}`).remove(); }
-function block() { if(confirm("Block user?")) { if(!blockedList.includes(activeFriend)) blockedList.push(activeFriend); db.ref(`users/${user.uid}/blocked`).set(blockedList).then(() => closeChat()); } }
+function block() { if(confirm("Block user?")) { if(!blockedList.includes(activeFriend)) blockedList.push(activeFriend); db.ref(`users/${user.uid}/blocked`).set(blockedList).then(() => { notify("Blocked!"); closeChat(); }); } }
 function report() { const r = prompt("Reason for reporting:"); if(r) db.ref('reports').push({ by: user.uid, target: activeFriend, reason: r, time: Date.now() }); }
 function accept(fid) { db.ref(`friends/${user.uid}/${fid}`).set(true); db.ref(`friends/${fid}/${user.uid}`).set(true); db.ref(`friend_requests/${user.uid}/${fid}`).remove(); notify("Request Accepted!"); }
 
